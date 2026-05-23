@@ -1,0 +1,20 @@
+param(
+    [string]$PythonExe = "python"
+)
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "[MiniSlicer] Setting up virtual environment..." -ForegroundColor Cyan
+if (-not (Test-Path ".venv")) {
+    & $PythonExe -m venv .venv
+}
+
+Write-Host "[MiniSlicer] Activating virtual environment..." -ForegroundColor Cyan
+& .\.venv\Scripts\Activate.ps1
+
+Write-Host "[MiniSlicer] Installing dependencies..." -ForegroundColor Cyan
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+Write-Host "[MiniSlicer] Setup complete." -ForegroundColor Green
+Write-Host "Run .\\scripts\\run.ps1 to start the app." -ForegroundColor Green
