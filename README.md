@@ -3,8 +3,6 @@
 A small but complete Python project that demonstrates core slicer and path-planning concepts
 used in additive manufacturing. Built as a portfolio piece for a working-student application.
 
----
-
 > **Disclaimer:** This is **not** an industrial metal 3D printing slicer.
 > It is a simplified educational toolpath visualizer intended to demonstrate Python skills,
 > geometry reasoning, and clean software design — not to replace production slicer software.
@@ -27,17 +25,17 @@ The app opens at `http://localhost:8501`.
 
 | Area | What it does |
 |---|---|
-| **Shapes** | Rectangle, circle (polygon approximation), isosceles triangle, custom polygon from coordinate text |
+| **Shapes / Imports** | 11 built-in shapes (Rectangle, Rounded Rectangle, Circle, Ellipse, Triangle, Regular Polygon, Star, Cross, Capsule, Arrow, Custom Polygon), plus SVG outlines and STL mesh slicing |
 | **Perimeters** | Inward offset rings using Shapely negative buffer; configurable count and spacing |
 | **Infill** | Parallel/grid/concentric modes, custom angle slider, optional alternating angle, or density-based spacing |
-| **Visualization** | Interactive Plotly chart with hover text, equal-aspect-ratio, colour-coded paths, start/end markers |
+| **Visualization** | 8 preview modes: Toolpath, Extrusion, Perimeters only, Infill only, Travel only, Speed map, Time map, and Path Density |
 | **Metrics** | Path length, segment count, perimeter and infill counts, estimated print time, bounding box |
 | **Path planning** | Optional nearest-neighbour ordering for perimeters and infill, with travel-distance estimate |
-| **Transforms** | Rotate and translate shapes to test placement and compare path behavior |
+| **Transforms** | Scale, mirror, rotate, translate, center, and fit shapes to a configurable build plate |
 | **Quality controls** | Geometry simplification tolerance and minimum segment-length filtering |
 | **Reproducibility** | Import prior run settings from JSON and re-apply parameter snapshots |
 | **Motion realism** | Separate travel speed, optional Z-hop, and optional E-value output in educational G-code |
-| **Export** | CSV, SVG, JSON (with parameters), and G-code-like educational text |
+| **Export** | CSV, SVG, JSON (with parameters), G-code-like educational text, and PNG image |
 
 ---
 
@@ -49,6 +47,8 @@ The app opens at `http://localhost:8501`.
 - [NumPy](https://numpy.org/) — array maths for infill line sampling
 - [Plotly](https://plotly.com/python/) — interactive visualization
 - [Pandas](https://pandas.pydata.org/) — tabular data and CSV export
+- [Trimesh](https://trimesh.org/) - STL mesh loading and cross-section slicing
+- [SciPy](https://scipy.org/) / [NetworkX](https://networkx.org/) - mesh section graph processing
 - [Pytest](https://docs.pytest.org/) — automated tests
 
 ---
@@ -123,6 +123,8 @@ All tests live in `tests/` and run without a database or external services.
 ```
 minislicer-toolpath-visualizer/
 ├── app.py                  # Streamlit UI entry point
+├── pages/
+│   └── tutorial.py         # In-app tutorial page (accessible from sidebar)
 ├── pyproject.toml          # Project metadata and tool configuration
 ├── requirements.txt
 ├── conftest.py             # Pytest path setup
@@ -132,7 +134,7 @@ minislicer-toolpath-visualizer/
 ├── scripts/
 │   ├── setup.ps1           # One-command local machine setup
 │   ├── run.ps1             # Launch app with project venv
-│   └── test.ps1            # Run test suite with project venv
+│   ├── test.ps1            # Run test suite with project venv
 │   ├── setup.cmd           # Windows CMD wrapper for setup
 │   ├── run.cmd             # Windows CMD wrapper for run
 │   └── test.cmd            # Windows CMD wrapper for tests
@@ -142,6 +144,7 @@ minislicer-toolpath-visualizer/
 │   ├── geometry.py         # Shape creation and polygon validation
 │   ├── toolpaths.py        # Perimeter and infill generation, Segment dataclass
 │   ├── metrics.py          # Path length, print-time estimate, bounding box
+│   ├── stl_import.py       # STL mesh metadata and Z-slice extraction
 │   ├── exporters.py        # CSV and G-code-like text export
 │   └── plotting.py         # Plotly figure builder
 ├── tests/
@@ -174,9 +177,6 @@ This project was built to practice and demonstrate:
 
 ## Future Improvements
 
-- **STL slicing preview** — load a real STL, rasterize cross-sections per layer, visualize the
-  full stack in 3D
-- **Better path ordering** — nearest-neighbour travel-move optimization to reduce air moves
 - **Support structure generation** — detect overhangs and add basic support geometry
 - **Real printer profiles** — machine-specific feedrate, layer height, and material presets
 - **Thermal constraint awareness** — flag regions with high local heat accumulation (relevant
@@ -214,6 +214,11 @@ Includes:
 - `segments` table rows for downstream tooling or reproducible comparisons
 
 You can re-import this JSON in the app sidebar under **Config Import (JSON)** to apply the saved parameter set.
+
+### PNG (`toolpaths_layer_N.png`)
+
+High-resolution rendered image (1600×1100 px, 2× scale) of the current toolpath visualization.
+Requires the optional `kaleido` package: `pip install kaleido`.
 
 ---
 

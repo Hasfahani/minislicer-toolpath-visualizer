@@ -25,7 +25,7 @@ st.info(
 with st.expander("Table of Contents", expanded=False):
     st.markdown("""
 1. [What is MiniSlicer?](#what-is-minislicer)
-2. [Quick Start in 5 steps](#quick-start-in-5-steps)
+2. [Quick Start in 7 steps](#quick-start-in-5-steps)
 3. [The Sidebar — your control panel](#the-sidebar-your-control-panel)
    - Shape
    - Perimeters
@@ -69,12 +69,13 @@ the movement of its nozzle to build up a single cross-section layer.
 
 **What it IS:**
 - An educational planning and visualization tool
+- A way to upload SVG outlines or STL meshes and turn one slice into a 2D toolpath
 - A fast way to compare infill patterns, perimeter counts, and spacing
 - A metrics calculator for path length, travel distance, print time, and material use
 - An exporter for CSV, G-code (educational), SVG, and JSON
 
 **What it is NOT:**
-- A production slicer (no real 3D model input, no support generation)
+- A production slicer (STL slicing is simplified, and there is no support generation)
 - Machine-ready output — never send the G-code directly to a printer
 """)
 with col_right:
@@ -101,11 +102,16 @@ st.divider()
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECTION 2 — Quick Start
 # ═══════════════════════════════════════════════════════════════════════════════
-st.header("2 · Quick Start in 5 Steps", anchor="quick-start-in-5-steps")
+st.header("2 · Quick Start in 7 Steps", anchor="quick-start-in-5-steps")
 
 st.markdown("Open the **main app** from the sidebar, then follow these steps:")
 
 steps = [
+    (
+        "Use Basic mode first",
+        "At the top of the main app, leave **Controls** set to **Basic** while learning. "
+        "Switch to **Advanced** when you want placement, preview, and quality controls.",
+    ),
     (
         "Pick a shape",
         "In the sidebar under **Shape**, choose **Rectangle** (it's the simplest). "
@@ -126,6 +132,11 @@ steps = [
         "Try a quick profile",
         "Open the **Quick Profiles** expander at the top of the page and select **Balanced**. "
         "This sets a sensible layer height, speed, and perimeter count all at once.",
+    ),
+    (
+        "Try STL slicing",
+        "Open **Import**, upload an `.stl`, then move the **STL slice Z** slider. "
+        "MiniSlicer extracts that horizontal cross-section and generates perimeters and infill from it.",
     ),
     (
         "Read the Metrics",
@@ -149,6 +160,12 @@ st.header("3 · The Sidebar — your control panel", anchor="the-sidebar-your-co
 st.markdown(
     "The sidebar is always visible on the left. Every control there "
     "immediately regenerates the toolpath and updates all tabs."
+)
+
+st.info(
+    "**Basic vs Advanced:** Basic mode keeps the common workflow visible. "
+    "Advanced mode opens placement, preview, and quality controls for deeper experiments.",
+    icon=":material/tune:",
 )
 
 # ── Shape ─────────────────────────────────────────────────────────────────────
@@ -181,6 +198,15 @@ Use the **Scale to width** field to set its printed size in mm.
 
 Supported SVG elements: `polygon`, `polyline`, `rect`,
 and simple `path` elements using M/L/Z commands.
+
+**STL Import** (same Import expander):
+
+Upload an `.stl` mesh, choose a target slice width, then move the
+**STL slice Z** slider. MiniSlicer cuts a horizontal section through the mesh,
+uses the largest closed loop, and generates perimeters/infill from that 2D slice.
+
+STL files are unitless, so the **STL slice target width** field controls the
+displayed/printed size in millimeters.
 
 **Custom Polygon format:**
 ```
@@ -673,6 +699,16 @@ MiniSlicer can save and restore **all your sidebar parameters** as a single JSON
 - Upload a `.svg` file
 - Set the target width in mm — MiniSlicer scales the shape proportionally
 - Complex SVGs with multiple paths use only the largest detected polygon
+
+**STL Import:**
+- Open the **Import** expander in the sidebar
+- Upload a `.stl` mesh
+- Set **STL slice target width** to scale the unitless mesh into millimeters
+- Move **STL slice Z** to choose the horizontal cross-section
+- MiniSlicer turns that slice into the active 2D shape and runs the normal toolpath workflow
+
+If the selected Z height misses the mesh or creates no closed loop, choose a
+different Z height inside the solid part of the model.
 """)
 
 st.divider()

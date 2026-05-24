@@ -45,6 +45,7 @@ from src.plotting import (
     shape_boundary,
 )
 from src.svg_import import parse_svg_to_polygon
+from src.stl_import import StlInfo, load_stl_info, slice_stl_to_polygon
 from src.toolpaths import (
     build_ordered_segments,
     filter_short_lines,
@@ -200,12 +201,17 @@ st.caption(
 )
 
 with st.expander("Quick Setup", expanded=True):
-    q1, q2, q3, q4 = st.columns([1.4, 1.4, 1.2, 1.2])
+    q1, q2, q3, q4, q5 = st.columns([1.25, 1.25, 1.0, 1.1, 1.2])
     profile = q1.selectbox("Profile", ["Custom", *PROFILES.keys()], index=3)
     process_mode = q2.segmented_control("Process", ["FDM", "DED / Metal"], default="FDM")
     default = PROFILES.get(profile, PROFILES["Balanced"])
     quick_plate = q3.segmented_control("Plate", ["None", "220 x 220", "300 x 300"], default="220 x 220")
-    q4.info("Use the sidebar for detailed controls.", icon=":material/tune:")
+    control_mode = q4.segmented_control("Controls", ["Basic", "Advanced"], default="Basic")
+    q5.info("Upload SVG/STL or use built-in shapes.", icon=":material/tune:")
+
+advanced = control_mode == "Advanced"
+stl_info: StlInfo | None = None
+stl_bytes: bytes | None = None
 
 with st.sidebar:
     st.header("Controls")
@@ -223,21 +229,43 @@ with st.sidebar:
 
         uploaded_svg = st.file_uploader("Import SVG shape", type=["svg"])
         svg_target_width = st.number_input("SVG target width (mm)", 5.0, value=80.0, step=5.0)
+        uploaded_stl = st.file_uploader("Import STL mesh", type=["stl"])
+        stl_target_width = st.number_input("STL slice target width (mm)", 5.0, value=80.0, step=5.0)
+        stl_slice_z = 0.0
+        if uploaded_svg is not None and uploaded_stl is not None:
+            st.warning("Both SVG and STL are loaded. STL slice is used.")
+        if uploaded_stl is not None:
+            try:
+                stl_bytes = uploaded_stl.getvalue()
+                stl_info = load_stl_info(stl_bytes)
+                st.caption(
+                    f"Mesh: {stl_info.width:.1f} x {stl_info.depth:.1f} x "
+                    f"{stl_info.height:.1f}, {stl_info.face_count} faces"
+                )
+                stl_slice_z = st.slider(
+                    "STL slice Z",
+                    min_value=float(stl_info.min_z),
+                    max_value=float(stl_info.max_z),
+                    value=float((stl_info.min_z + stl_info.max_z) / 2.0),
+                    step=max(float(stl_info.height) / 100.0, 0.01),
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.warning(f"Could not inspect STL: {exc}")
 
     with st.expander("Shape", expanded=True):
-        shape_type = st.selectbox("Shape", SHAPES, index=0, disabled=uploaded_svg is not None)
+        shape_type = st.selectbox("Shape", SHAPES, index=0, disabled=uploaded_svg is not None or uploaded_stl is not None)
         width = st.number_input("Width / base (mm)", 1.0, value=50.0, step=1.0)
         height = st.number_input("Height (mm)", 1.0, value=30.0, step=1.0)
         radius = st.number_input("Radius (mm)", 1.0, value=22.0, step=1.0)
-        corner_radius = st.number_input("Corner radius (mm)", 0.0, value=5.0, step=0.5)
-        sides = st.slider("Polygon sides", 3, 16, 6)
-        points = st.slider("Star points", 3, 12, 5)
-        inner_radius = st.number_input("Star inner radius (mm)", 0.5, value=10.0, step=0.5)
-        size = st.number_input("Cross size (mm)", 1.0, value=42.0, step=1.0)
-        arm_width = st.number_input("Cross arm width (mm)", 0.5, value=14.0, step=0.5)
-        length = st.number_input("Arrow length (mm)", 1.0, value=54.0, step=1.0)
-        head_width = st.number_input("Arrow head width (mm)", 1.0, value=24.0, step=1.0)
-        shaft_width = st.number_input("Arrow shaft width (mm)", 0.5, value=10.0, step=0.5)
+        corner_radius = st.number_input("Corner radius (mm)", 0.0, value=5.0, step=0.5, disabled=not advanced)
+        sides = st.slider("Polygon sides", 3, 16, 6, disabled=not advanced)
+        points = st.slider("Star points", 3, 12, 5, disabled=not advanced)
+        inner_radius = st.number_input("Star inner radius (mm)", 0.5, value=10.0, step=0.5, disabled=not advanced)
+        size = st.number_input("Cross size (mm)", 1.0, value=42.0, step=1.0, disabled=not advanced)
+        arm_width = st.number_input("Cross arm width (mm)", 0.5, value=14.0, step=0.5, disabled=not advanced)
+        length = st.number_input("Arrow length (mm)", 1.0, value=54.0, step=1.0, disabled=not advanced)
+        head_width = st.number_input("Arrow head width (mm)", 1.0, value=24.0, step=1.0, disabled=not advanced)
+        shaft_width = st.number_input("Arrow shaft width (mm)", 0.5, value=10.0, step=0.5, disabled=not advanced)
         coords_text = st.text_area("Custom polygon", value="0,0; 50,0; 40,25; 10,35")
 
     with st.expander("Toolpath", expanded=True):
@@ -256,7 +284,8 @@ with st.sidebar:
     with st.expander("Process", expanded=True):
         layer_number = st.number_input("Layer", min_value=1, value=1, step=1)
         layer_height = st.number_input("Layer height (mm)", 0.05, value=float(default["layer_height"]), step=0.01)
-        model_height = st.number_input("Model height estimate (mm)", 0.05, value=5.0, step=0.5)
+        default_model_height = float(stl_info.height) if stl_info is not None and stl_info.height > 0 else 5.0
+        model_height = st.number_input("Model height estimate (mm)", 0.05, value=default_model_height, step=0.5)
         print_speed = st.number_input("Print speed (mm/s)", 0.1, value=float(default["speed"]), step=1.0)
         travel_speed = st.number_input("Travel speed (mm/s)", 0.1, value=max(100.0, float(default["speed"]) * 2), step=5.0)
         material_choice = st.selectbox("Material", list(MATERIAL_DENSITY.keys()))
@@ -264,7 +293,7 @@ with st.sidebar:
         filament_diameter = st.selectbox("Filament diameter (mm)", [1.75, 2.85])
         material_cost = st.number_input("Material cost ($/kg)", 0.0, value=24.0, step=1.0)
 
-    with st.expander("Placement", expanded=False):
+    with st.expander("Placement", expanded=advanced):
         show_plate = st.checkbox("Show build plate", value=quick_plate != "None")
         plate_default = 300.0 if quick_plate == "300 x 300" else 220.0
         plate_w = st.number_input("Plate width (mm)", 10.0, value=plate_default, step=10.0)
@@ -279,7 +308,7 @@ with st.sidebar:
         translate_x = st.number_input("Translate X (mm)", value=0.0, step=1.0)
         translate_y = st.number_input("Translate Y (mm)", value=0.0, step=1.0)
 
-    with st.expander("Preview", expanded=False):
+    with st.expander("Preview", expanded=advanced):
         color_scheme = st.selectbox("Color scheme", ["Classic", "Colorblind", "Dark", "Neon"], index=0)
         line_width_scale = st.slider("Line thickness", 0.5, 3.0, 1.0, 0.25)
         show_boundary = st.checkbox("Outline", value=True)
@@ -292,7 +321,7 @@ with st.sidebar:
         show_dimensions = st.checkbox("Dimensions", value=True)
         show_extrusion = st.checkbox("Extrusion width", value=False)
 
-    with st.expander("Quality / Export", expanded=False):
+    with st.expander("Quality / Export", expanded=advanced):
         optimize_perimeters = st.checkbox("Optimize perimeter order", value=False)
         optimize_infill = st.checkbox("Optimize infill order", value=True)
         reverse_lines = st.checkbox("Allow line reversal", value=True, disabled=not optimize_infill)
@@ -318,8 +347,16 @@ shape_settings = {
     "coords_text": coords_text,
 }
 
-if uploaded_svg is not None:
+source_label = shape_type
+if uploaded_stl is not None and stl_bytes is not None:
+    shape = slice_stl_to_polygon(stl_bytes, z_height=stl_slice_z, target_width_mm=stl_target_width)
+    source_label = f"STL slice Z={stl_slice_z:.2f}"
+    if shape is None:
+        st.error("The STL could not be sliced at this Z height. Try a slice inside the solid model.")
+        st.stop()
+elif uploaded_svg is not None:
     shape, svg_error = parse_svg_to_polygon(uploaded_svg.read(), target_width_mm=svg_target_width)
+    source_label = "SVG"
     if shape is None:
         st.error(f"SVG import failed: {svg_error}")
         st.stop()
@@ -531,7 +568,7 @@ with tab_data:
 
 with tab_export:
     params = {
-        "shape_type": "SVG" if uploaded_svg is not None else shape_type,
+        "shape_type": source_label,
         "process_mode": process_mode,
         "profile": profile,
         "perimeter_count": int(perimeter_count),
@@ -565,7 +602,7 @@ with tab_export:
             "",
             f"Profile: {profile}",
             f"Process: {process_mode}",
-            f"Shape: {'SVG' if uploaded_svg else shape_type}",
+            f"Shape: {source_label}",
             f"Infill: {infill_pattern}, {effective_spacing:.2f} mm, {effective_angle:+.0f} deg",
             f"Path length: {metrics['total_path_length_mm']:.2f} mm",
             f"Travel length: {metrics['travel_length_mm']:.2f} mm",
