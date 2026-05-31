@@ -40,6 +40,26 @@ def estimate_print_time_seconds(total_length_mm: float, print_speed_mm_s: float)
     return float(total_length_mm / print_speed_mm_s)
 
 
+def _move_time_s(length_mm: float, speed_mm_s: float, accel_mm_s2: float) -> float:
+    """Trapezoidal velocity profile time for a single motion segment.
+
+    For short moves that cannot reach full speed the profile is triangular;
+    for longer moves a cruise phase is added between the ramp-up and ramp-down.
+    Falls back to constant-speed if acceleration is zero or negative.
+    """
+    if length_mm <= 0 or speed_mm_s <= 0:
+        return 0.0
+    if accel_mm_s2 <= 0:
+        return length_mm / speed_mm_s
+    # Distance consumed by a full ramp-up + ramp-down (both symmetric)
+    d_ramp = speed_mm_s ** 2 / accel_mm_s2
+    if length_mm >= d_ramp:
+        # Cruise phase exists: t = V/A (ramp) + (L - d_ramp)/V (cruise)
+        return speed_mm_s / accel_mm_s2 + (length_mm - d_ramp) / speed_mm_s
+    # Triangular profile — peak speed never reached
+    return 2.0 * math.sqrt(length_mm / accel_mm_s2)
+
+
 def estimate_material(
     total_path_length_mm: float,
     layer_height_mm: float,
@@ -55,8 +75,12 @@ def estimate_material(
     """
     density = MATERIAL_DENSITY.get(material, 1.24)
 
-    # Volume of material deposited (mm³)
-    material_volume_mm3 = total_path_length_mm * layer_height_mm * nozzle_diameter_mm
+    # Volume of material deposited (mm³) using elliptical bead cross-section:
+    #   A_bead ≈ (π/4) × nozzle_diameter × layer_height
+    # This is more accurate than a rectangular cross-section because the
+    # extruded bead rounds at the edges; π/4 ≈ 0.785 reduces the estimate
+    # by ~21% compared to the flat rectangular model.
+    material_volume_mm3 = (math.pi / 4.0) * total_path_length_mm * layer_height_mm * nozzle_diameter_mm
 
     # Filament volume → filament length
     filament_radius_mm = filament_diameter_mm / 2.0
@@ -87,6 +111,8 @@ def summarize_metrics(
     nozzle_diameter_mm: float = 0.4,
     filament_diameter_mm: float = 1.75,
     material: str = "PLA",
+    acceleration_mm_s2: float = 500.0,
+    perimeter_speed_mult: float = 0.8,
 ) -> dict[str, Any]:
     """Return a full metric summary dictionary for UI display."""
     total_len = total_path_length(segments)
@@ -103,9 +129,18 @@ def summarize_metrics(
     total_motion = total_len + travel_length
     path_efficiency_pct = (100.0 * total_len / total_motion) if total_motion > 0 else 0.0
     travel_speed = max(float(travel_speed_mm_s or print_speed_mm_s), 0.1)
-    estimated_motion_time_s = estimate_print_time_seconds(total_len, print_speed_mm_s) + (
-        travel_length / travel_speed
-    )
+
+    # Per-segment trapezoidal velocity profile accounts for acceleration and the
+    # slower perimeter speed; more accurate than dividing total length by speed.
+    perim_speed = max(0.1, print_speed_mm_s * perimeter_speed_mult)
+    estimated_motion_time_s = sum(
+        _move_time_s(
+            seg.length_mm,
+            perim_speed if seg.path_type == "perimeter" else print_speed_mm_s,
+            acceleration_mm_s2,
+        )
+        for seg in segments
+    ) + _move_time_s(travel_length, travel_speed, acceleration_mm_s2)
 
     mat = estimate_material(
         total_path_length_mm=total_len,

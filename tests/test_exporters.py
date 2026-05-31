@@ -7,11 +7,14 @@ import pandas as pd
 
 from src.exporters import (
     CSV_COLUMNS,
+    ProductionExportError,
     export_gcode_like,
+    export_production_gcode,
     export_segments_csv,
     export_segments_json,
     segments_to_dataframe,
 )
+from src.profiles import FDM_MACHINE_PROFILES
 from src.toolpaths import Segment
 
 
@@ -20,6 +23,14 @@ def _sample_segments() -> list[Segment]:
         Segment("boundary", 0, 0.0, 0.0, 10.0, 0.0, 10.0, 1),
         Segment("perimeter", 1, 10.0, 0.0, 10.0, 5.0, 5.0, 1),
         Segment("infill", 2, 0.0, 1.0, 10.0, 1.0, 10.0, 1),
+    ]
+
+
+def _sample_multilayer_segments() -> list[Segment]:
+    return [
+        *_sample_segments(),
+        Segment("perimeter", 3, 0.0, 0.0, 10.0, 0.0, 10.0, 2),
+        Segment("infill", 4, 0.0, 2.0, 10.0, 2.0, 10.0, 2),
     ]
 
 
@@ -123,3 +134,81 @@ def test_gcode_export_includes_z_hop_when_enabled() -> None:
     )
     assert "Z-hop" in gcode
     assert "return to layer Z" in gcode
+
+
+def test_production_gcode_includes_machine_start_and_end_sequence() -> None:
+    machine = FDM_MACHINE_PROFILES["Generic Marlin 220x220"]
+    gcode = export_production_gcode(
+        _sample_segments(),
+        machine=machine,
+        print_speed_mm_s=20.0,
+        layer_height_mm=0.2,
+        travel_speed_mm_s=100.0,
+        extrusion_per_mm=0.04,
+        job_name="test job",
+    )
+
+    assert "; MiniSlicer production FDM export" in gcode
+    assert "; Layers: 1" in gcode
+    assert "; Segments: 3" in gcode
+    assert "; Toolpath-SHA256:" in gcode
+    assert "M190 S60" in gcode
+    assert "M109 S205" in gcode
+    assert "G28" in gcode
+    assert "M104 S0" in gcode
+    assert "M140 S0" in gcode
+    assert " E" in gcode
+
+
+def test_production_gcode_rejects_out_of_bounds_moves() -> None:
+    machine = FDM_MACHINE_PROFILES["Generic Marlin 220x220"]
+    bad_segments = [Segment("infill", 0, 0.0, 0.0, 300.0, 0.0, 300.0, 1)]
+
+    try:
+        export_production_gcode(
+            bad_segments,
+            machine=machine,
+            print_speed_mm_s=20.0,
+            layer_height_mm=0.2,
+            travel_speed_mm_s=100.0,
+            extrusion_per_mm=0.04,
+        )
+    except ProductionExportError as exc:
+        assert "outside" in str(exc)
+    else:
+        raise AssertionError("Expected out-of-bounds production export to fail")
+
+
+def test_production_gcode_rejects_missing_extrusion_calibration() -> None:
+    machine = FDM_MACHINE_PROFILES["Generic Marlin 220x220"]
+
+    try:
+        export_production_gcode(
+            _sample_segments(),
+            machine=machine,
+            print_speed_mm_s=20.0,
+            layer_height_mm=0.2,
+            travel_speed_mm_s=100.0,
+            extrusion_per_mm=0.0,
+        )
+    except ProductionExportError as exc:
+        assert "Extrusion" in str(exc)
+    else:
+        raise AssertionError("Expected zero extrusion calibration to fail")
+
+
+def test_production_gcode_exports_all_layers() -> None:
+    machine = FDM_MACHINE_PROFILES["Generic Marlin 220x220"]
+    gcode = export_production_gcode(
+        _sample_multilayer_segments(),
+        machine=machine,
+        print_speed_mm_s=20.0,
+        layer_height_mm=0.2,
+        travel_speed_mm_s=100.0,
+        extrusion_per_mm=0.04,
+    )
+
+    assert "; Layers: 2" in gcode
+    assert ";LAYER:1" in gcode
+    assert ";LAYER:2" in gcode
+    assert "G1 Z0.400" in gcode

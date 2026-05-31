@@ -180,6 +180,145 @@ def create_toolpath_figure(
     return fig
 
 
+def create_multilayer_animated_figure(
+    layers: list[tuple[float, list[LineString], list[LineString]]],
+    color_scheme: str = "Classic",
+) -> go.Figure:
+    """Build an animated 3D Plotly figure that builds up one layer at a time.
+
+    Args:
+        layers: Sequence of ``(z_height, perimeter_paths, infill_lines)`` tuples,
+            one per sliced layer. Sorted by ascending Z is assumed.
+        color_scheme: Name passed to ``_colors_for_scheme`` for line colors.
+
+    Returns:
+        A ``go.Figure`` with a play/pause button and a per-layer slider.
+        Each animation frame reveals an additional layer of the build.
+    """
+    colors = _colors_for_scheme(color_scheme)
+
+    if not layers:
+        fig = go.Figure()
+        fig.update_layout(title="No layers to display.", template="plotly_white")
+        return fig
+
+    # Pre-accumulate (x, y, z) coordinate lists for perimeters and infill
+    # at each frame (layer 0, layers 0-1, layers 0-2, …).
+    # Using None-separated single traces keeps frame payloads small.
+    acc_px: list[float | None] = []
+    acc_py: list[float | None] = []
+    acc_pz: list[float | None] = []
+    acc_ix: list[float | None] = []
+    acc_iy: list[float | None] = []
+    acc_iz: list[float | None] = []
+
+    frame_data: list[tuple[list, list, list, list, list, list]] = []
+
+    for z, perims, infills in layers:
+        for line in perims:
+            xs, ys = line.xy
+            acc_px.extend(list(xs) + [None])
+            acc_py.extend(list(ys) + [None])
+            acc_pz.extend([z] * len(xs) + [None])
+        for line in infills:
+            xs, ys = line.xy
+            acc_ix.extend(list(xs) + [None])
+            acc_iy.extend(list(ys) + [None])
+            acc_iz.extend([z] * len(xs) + [None])
+        frame_data.append((
+            list(acc_px), list(acc_py), list(acc_pz),
+            list(acc_ix), list(acc_iy), list(acc_iz),
+        ))
+
+    # Initial display = first layer only
+    p0x, p0y, p0z, i0x, i0y, i0z = frame_data[0]
+
+    initial_traces = [
+        go.Scatter3d(
+            x=p0x, y=p0y, z=p0z,
+            mode="lines",
+            line=dict(color=colors["perimeter"], width=2),
+            name="Perimeters",
+        ),
+        go.Scatter3d(
+            x=i0x, y=i0y, z=i0z,
+            mode="lines",
+            line=dict(color=colors["infill"], width=1),
+            name="Infill",
+        ),
+    ]
+
+    frames = [
+        go.Frame(
+            name=str(idx),
+            data=[
+                go.Scatter3d(x=px, y=py, z=pz, mode="lines",
+                             line=dict(color=colors["perimeter"], width=2)),
+                go.Scatter3d(x=ix, y=iy, z=iz, mode="lines",
+                             line=dict(color=colors["infill"], width=1)),
+            ],
+        )
+        for idx, (px, py, pz, ix, iy, iz) in enumerate(frame_data)
+    ]
+
+    fig = go.Figure(data=initial_traces, frames=frames)
+
+    z_vals = [z for z, _, _ in layers]
+    slider_steps = [
+        dict(
+            method="animate",
+            label=f"Z={z:.2f}",
+            args=[
+                [str(idx)],
+                dict(frame=dict(duration=0, redraw=True),
+                     mode="immediate",
+                     transition=dict(duration=0)),
+            ],
+        )
+        for idx, z in enumerate(z_vals)
+    ]
+
+    fig.update_layout(
+        title=f"Multi-Layer Build — {len(layers)} layer{'s' if len(layers) != 1 else ''}",
+        scene=dict(
+            xaxis_title="X (mm)",
+            yaxis_title="Y (mm)",
+            zaxis_title="Z (mm)",
+            aspectmode="data",
+        ),
+        margin=dict(l=0, r=0, t=60, b=80),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.0),
+        updatemenus=[dict(
+            type="buttons",
+            showactive=False,
+            y=-0.12, x=0.5, xanchor="center", yanchor="top",
+            buttons=[
+                dict(
+                    label="▶  Play",
+                    method="animate",
+                    args=[None, dict(frame=dict(duration=300, redraw=True),
+                                    fromcurrent=True,
+                                    transition=dict(duration=0))],
+                ),
+                dict(
+                    label="⏸  Pause",
+                    method="animate",
+                    args=[[None], dict(frame=dict(duration=0, redraw=False),
+                                      mode="immediate",
+                                      transition=dict(duration=0))],
+                ),
+            ],
+        )],
+        sliders=[dict(
+            currentvalue=dict(prefix="Layer Z: ", visible=True, xanchor="center",
+                              font=dict(size=12)),
+            pad=dict(t=50, b=10),
+            steps=slider_steps,
+        )],
+    )
+    return fig
+
+
 def create_3d_figure(
     shape: Polygon,
     layer_count: int,

@@ -1,827 +1,528 @@
-"""Interactive tutorial page for MiniSlicer."""
+"""Advanced tutorial and operating guide for MiniSlicer."""
+
+from __future__ import annotations
 
 import streamlit as st
 
+
 st.set_page_config(
-    page_title="MiniSlicer — Tutorial",
+    page_title="MiniSlicer - Advanced Guide",
     layout="wide",
-    page_icon="📖",
+    page_icon=":material/menu_book:",
 )
 
-# ── Header ────────────────────────────────────────────────────────────────────
-st.title("📖 MiniSlicer — Complete Tutorial")
-st.caption(
-    "Everything you need to go from zero to a fully understood toolpath plan. "
-    "Read top-to-bottom for the first time, or jump to any section."
+
+def tutorial_css() -> None:
+    st.markdown(
+        """
+        <style>
+        .block-container { max-width: 1240px; padding-top: 1rem; padding-bottom: 2.5rem; }
+        .guide-hero {
+            background: #172033;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 1.2rem 1.35rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 12px 30px rgba(23, 32, 51, 0.12);
+        }
+        .guide-hero h1 {
+            color: #f8fafc;
+            font-size: 1.72rem;
+            line-height: 1.2;
+            margin: 0 0 0.35rem 0;
+            letter-spacing: 0;
+        }
+        .guide-hero p {
+            color: #cbd5e1;
+            margin: 0;
+            max-width: 850px;
+            font-size: 0.96rem;
+        }
+        .guide-card {
+            border: 1px solid #d7dde8;
+            border-radius: 8px;
+            padding: 0.9rem 1rem;
+            background: #ffffff;
+            min-height: 8rem;
+        }
+        .guide-card strong { color: #172033; }
+        .guide-kicker {
+            color: #475569;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+        }
+        .guide-callout {
+            border-left: 4px solid #0f766e;
+            background: #f0fdfa;
+            padding: 0.75rem 0.9rem;
+            border-radius: 6px;
+            margin: 0.35rem 0 0.65rem;
+        }
+        div[data-testid="stExpander"] { border-radius: 8px; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def expander(title: str, body: str, *, expanded: bool = False) -> None:
+    with st.expander(title, expanded=expanded):
+        st.markdown(body)
+
+
+def format_mm(value: float) -> str:
+    return f"{value:.2f} mm"
+
+
+tutorial_css()
+
+st.markdown(
+    """
+    <div class="guide-hero">
+        <h1>MiniSlicer Advanced Operating Guide</h1>
+        <p>
+            Use this as a tuning manual: choose a goal, change the right controls,
+            inspect the right tab, and understand what each warning or metric means.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 st.info(
-    "**New here?** Start at Step 1 and follow along in the main app "
-    "(open it from the sidebar). Each step is short and takes about 1–2 minutes.",
-    icon="👋",
+    "Open the MiniSlicer planner from the sidebar. Keep this page open as a decision guide while you tune settings."
 )
 
-# ── Table of contents ─────────────────────────────────────────────────────────
-with st.expander("Table of Contents", expanded=False):
-    st.markdown("""
-1. [What is MiniSlicer?](#what-is-minislicer)
-2. [Quick Start in 7 steps](#quick-start-in-5-steps)
-3. [The Sidebar — your control panel](#the-sidebar-your-control-panel)
-   - Shape
-   - Perimeters
-   - Infill
-   - Process
-   - Material
-   - Display
-   - Path Planning
-   - Quality
-   - Transform
-   - Motion / Export
-4. [Infill Patterns — deep dive](#infill-patterns-deep-dive)
-5. [The Tabs — what each one does](#the-tabs-what-each-one-does)
-   - Visualization
-   - Compare
-   - Animation
-   - 3D View
-   - Metrics
-   - Advisor
-   - Segment Data
-   - Export
-6. [Quick Profiles](#quick-profiles)
-7. [Importing & Exporting Configs](#importing-exporting-configs)
-8. [Tips, Tricks & Common Mistakes](#tips-tricks-common-mistakes)
-9. [Glossary](#glossary)
-""")
+top_cards = st.columns(3)
+with top_cards[0]:
+    st.markdown(
+        """
+        <div class="guide-card">
+            <div class="guide-kicker">Do first</div>
+            <strong>Pick a measurable goal.</strong><br>
+            Optimize for speed, strength, visual clarity, path efficiency, or export readiness.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+with top_cards[1]:
+    st.markdown(
+        """
+        <div class="guide-card">
+            <div class="guide-kicker">Then change</div>
+            <strong>One variable at a time.</strong><br>
+            Spacing, perimeters, angle, clearance, and optimization each leave a different signature.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+with top_cards[2]:
+    st.markdown(
+        """
+        <div class="guide-card">
+            <div class="guide-kicker">Always verify</div>
+            <strong>Preview plus Advisor.</strong><br>
+            The chart shows geometry; Advisor shows whether the plan is coherent enough to export.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 st.divider()
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 1 — What is MiniSlicer
-# ═══════════════════════════════════════════════════════════════════════════════
-st.header("1 · What is MiniSlicer?", anchor="what-is-minislicer")
+st.header("Goal-Based Recipes", anchor="goal-recipes")
+goal = st.selectbox(
+    "What are you trying to improve?",
+    [
+        "Fast preview / teaching demo",
+        "Stronger FDM part",
+        "Cleaner surface / fewer artifacts",
+        "Lower material use",
+        "Better path efficiency",
+        "Production G-code readiness",
+        "DED / metal planning review",
+    ],
+)
 
-col_left, col_right = st.columns([3, 2])
-with col_left:
-    st.markdown("""
-MiniSlicer is an **interactive 2D toolpath visualizer** for additive manufacturing.
-It lets you experiment with how a 3D printer — FDM plastic or DED metal — plans
-the movement of its nozzle to build up a single cross-section layer.
+recipes = {
+    "Fast preview / teaching demo": {
+        "settings": [
+            "Quality profile: Fast Preview or Draft",
+            "Shape: Rectangle, Circle, or simple SVG",
+            "Perimeters: 1-2",
+            "Spacing: 5-8 mm or Density: 10-20%",
+            "Preview mode: Toolpath, then Animation",
+        ],
+        "watch": "Segment count, render speed, and whether the infill pattern is readable at a glance.",
+        "avoid": "Dense honeycomb on a large shape; it hides the concept behind too many lines.",
+    },
+    "Stronger FDM part": {
+        "settings": [
+            "Quality profile: Strong, then switch to Advanced",
+            "Perimeters: 4-5",
+            "Spacing: 1.8-2.5 mm or Density: 35-60%",
+            "Alternate angle each layer: on",
+            "Infill overlap: 0.05-0.15 mm",
+        ],
+        "watch": "Material, full build time, and Density view for over-concentrated zones.",
+        "avoid": "Layer height above roughly 75% of nozzle diameter; Advisor should flag this.",
+    },
+    "Cleaner surface / fewer artifacts": {
+        "settings": [
+            "Perimeter speed mult.: 0.6-0.85",
+            "Perimeters: 3-4",
+            "Line thickness display: 1.0-1.5 for inspection",
+            "Show seam markers and start/end points",
+            "Try Concentric for shape-following internal paths",
+        ],
+        "watch": "Seams, short segments, and perimeter spacing relative to nozzle diameter.",
+        "avoid": "Aggressive simplification that visibly changes corners or small features.",
+    },
+    "Lower material use": {
+        "settings": [
+            "Perimeters: 2",
+            "Spacing: 4-7 mm or Density: 10-25%",
+            "Wall clearance: 0-0.2 mm",
+            "Use Compare to test Zigzag vs Parallel Lines",
+            "Model height: set to real part height before trusting full material estimates",
+        ],
+        "watch": "Material, cost, full build time, and whether no-infill warnings appear.",
+        "avoid": "Reducing perimeters before checking whether the part still needs shell strength.",
+    },
+    "Better path efficiency": {
+        "settings": [
+            "Advanced controls: on",
+            "Optimize infill order: on",
+            "Allow line reversal: on",
+            "Try Zigzag or Concentric",
+            "Preview mode: Travel only, then Metrics",
+        ],
+        "watch": "Travel share, path efficiency, and optimization results in Metrics.",
+        "avoid": "Judging only by total path length; travel can dominate motion time on fragmented paths.",
+    },
+    "Production G-code readiness": {
+        "settings": [
+            "Process: FDM",
+            "Show build plate: on",
+            "Center on plate or Fit inside plate",
+            "Set nozzle, layer height, travel speed, and E/mm in Advanced mode",
+            "Advisor status must not be Blocked",
+        ],
+        "watch": "Production export status, machine profile bounds, and readiness blockers.",
+        "avoid": "Treating preview G-code as machine-ready; it is educational output.",
+    },
+    "DED / metal planning review": {
+        "settings": [
+            "Process: DED / Metal",
+            "Use a metal material profile",
+            "Prefer larger spacing and simpler paths for first inspection",
+            "Use Speed map and Time map to inspect motion assumptions",
+            "Export CSV/JSON/report for review rather than production FDM G-code",
+        ],
+        "watch": "Weight, path length, motion time, and whether the shape creates tiny unstable segments.",
+        "avoid": "Using FDM production G-code export for metal workflows.",
+    },
+}
 
-**What it IS:**
-- An educational planning and visualization tool
-- A way to upload SVG outlines or STL meshes and turn one slice into a 2D toolpath
-- A fast way to compare infill patterns, perimeter counts, and spacing
-- A metrics calculator for path length, travel distance, print time, and material use
-- An exporter for CSV, G-code (educational), SVG, and JSON
-
-**What it is NOT:**
-- A production slicer (STL slicing is simplified, and there is no support generation)
-- Machine-ready output — never send the G-code directly to a printer
-""")
-with col_right:
-    st.markdown("""
-```
-A typical toolpath plan:
-
-┌─────────────────────────┐
-│  Outline (boundary)     │
-│  ┌───────────────────┐  │
-│  │  Perimeter 1      │  │
-│  │  ┌─────────────┐  │  │
-│  │  │ Infill ///  │  │  │
-│  │  │ lines  ///  │  │  │
-│  │  └─────────────┘  │  │
-│  └───────────────────┘  │
-└─────────────────────────┘
-```
-""")
-    st.caption("The nozzle traces the outer outline, then perimeter rings, then infill lines to fill the interior.")
+selected = recipes[goal]
+recipe_cols = st.columns([1.25, 1, 1])
+with recipe_cols[0]:
+    st.markdown("**Recommended controls**")
+    for item in selected["settings"]:
+        st.markdown(f"- {item}")
+with recipe_cols[1]:
+    st.markdown("**Inspect**")
+    st.markdown(selected["watch"])
+with recipe_cols[2]:
+    st.markdown("**Avoid**")
+    st.markdown(selected["avoid"])
 
 st.divider()
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 2 — Quick Start
-# ═══════════════════════════════════════════════════════════════════════════════
-st.header("2 · Quick Start in 7 Steps", anchor="quick-start-in-5-steps")
+st.header("Formula Lab", anchor="formula-lab")
+st.caption("Use these calculators to predict what a setting change will do before you touch the planner.")
 
-st.markdown("Open the **main app** from the sidebar, then follow these steps:")
+calc1, calc2, calc3, calc4 = st.columns(4)
+nozzle = calc1.number_input("Nozzle diameter (mm)", min_value=0.1, value=0.4, step=0.05)
+layer_height = calc2.number_input("Layer height (mm)", min_value=0.05, value=0.2, step=0.01)
+density = calc3.slider("Target density (%)", min_value=5, max_value=100, value=25, step=5)
+path_length = calc4.number_input("Path length on layer (mm)", min_value=0.0, value=1000.0, step=50.0)
 
-steps = [
+spacing_from_density = nozzle * 100.0 / density
+extrusion_area = nozzle * layer_height
+volume = path_length * extrusion_area
+pla_weight = volume / 1000.0 * 1.24
+
+metric_cols = st.columns(4)
+metric_cols[0].metric("Spacing from density", format_mm(spacing_from_density))
+metric_cols[1].metric("Extrusion area", f"{extrusion_area:.3f} mm^2")
+metric_cols[2].metric("Layer volume", f"{volume:.1f} mm^3")
+metric_cols[3].metric("PLA weight/layer", f"{pla_weight:.3f} g")
+
+st.markdown(
+    """
+    <div class="guide-callout">
+    Density mode is derived from nozzle width: spacing = nozzle diameter x 100 / density.
+    For example, a 0.4 mm nozzle at 25% density gives about 1.60 mm spacing.
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.divider()
+
+st.header("Diagnosis Matrix", anchor="diagnosis")
+
+diagnosis = [
     (
-        "Use Basic mode first",
-        "At the top of the main app, leave **Controls** set to **Basic** while learning. "
-        "Switch to **Advanced** when you want placement, preview, and quality controls.",
+        "No infill lines",
+        "Spacing too large, wall clearance too high, or shape too small.",
+        "Lower spacing, increase density, reduce wall clearance, or test with a bigger rectangle.",
+        "Preview, Advisor",
     ),
     (
-        "Pick a shape",
-        "In the sidebar under **Shape**, choose **Rectangle** (it's the simplest). "
-        "Leave the width at 40 mm and height at 25 mm. The visualization updates instantly.",
+        "Many tiny segments",
+        "Complex imported outline, sharp corners, or dense pattern intersection.",
+        "Try Simplify tol. 0.02-0.10 mm, raise min segment length, or simplify the SVG/STL source.",
+        "Data, Metrics",
     ),
     (
-        "Choose an infill pattern",
-        "Under **Infill**, change the pattern to **Zigzag**. "
-        "Watch the diagonal lines in the Visualization tab flip direction alternately — "
-        "that's what zigzag does to cut travel time.",
+        "High travel share",
+        "Disconnected paths or inefficient ordering.",
+        "Turn on Optimize infill order, allow line reversal, compare Zigzag or Concentric.",
+        "Travel only, Metrics",
     ),
     (
-        "Adjust infill spacing",
-        "Set **Infill spacing** to **2.0 mm** for dense fill, then try **6.0 mm** for sparse fill. "
-        "Notice how the Metrics tab updates the path length and estimated print time.",
+        "Production export disabled",
+        "Blocked readiness, non-FDM process, layer limit, out-of-bounds motion, or invalid E/mm.",
+        "Open Advisor, center on plate, choose FDM, verify machine profile and export settings.",
+        "Advisor, Export",
     ),
     (
-        "Try a quick profile",
-        "Open the **Quick Profiles** expander at the top of the page and select **Balanced**. "
-        "This sets a sensible layer height, speed, and perimeter count all at once.",
+        "Full build estimate looks wrong",
+        "Model height or layer height does not match the intended part.",
+        "Set Model height and Layer height before reading full build time, material, or cost.",
+        "Print Settings, Metrics",
     ),
     (
-        "Try STL slicing",
-        "Open **Import**, upload an `.stl`, then move the **STL slice Z** slider. "
-        "MiniSlicer extracts that horizontal cross-section and generates perimeters and infill from it.",
-    ),
-    (
-        "Read the Metrics",
-        "Click the **Metrics** tab. You'll see path length, travel distance, efficiency, "
-        "and a visual pie chart of how the print time is split. "
-        "Try the **Advisor** tab to check whether your settings look coherent.",
+        "STL slice fails",
+        "Selected Z misses the mesh or produces no closed loop.",
+        "Move Slice at Z into the solid region; avoid top/bottom tangent slices for first tests.",
+        "Import, 3D",
     ),
 ]
 
-for idx, (title, body) in enumerate(steps, 1):
-    with st.expander(f"Step {idx} — {title}", expanded=idx == 1):
-        st.markdown(body)
+st.markdown("| Symptom | Likely cause | Fix | Check here |")
+st.markdown("|---|---|---|---|")
+for symptom, cause, fix, where in diagnosis:
+    st.markdown(f"| **{symptom}** | {cause} | {fix} | {where} |")
 
 st.divider()
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 3 — Sidebar
-# ═══════════════════════════════════════════════════════════════════════════════
-st.header("3 · The Sidebar — your control panel", anchor="the-sidebar-your-control-panel")
+st.header("Parameter Playbooks", anchor="parameter-playbooks")
 
+playbook_tabs = st.tabs(["Infill", "Perimeters", "Motion", "Imports", "Exports"])
+
+with playbook_tabs[0]:
+    st.markdown(
+        """
+        **Infill controls strength, time, and readability.**
+
+        | Change | Expected metric shift | Visual signature |
+        |---|---|---|
+        | Lower spacing | Higher path length, material, and segment count | Denser internal lines |
+        | Higher density | Same as lower spacing | More filled interior |
+        | Alternate angle | Similar single-layer metrics | Different direction on odd/even layers |
+        | Wall clearance up | Less infill near walls | Gap between shell and fill |
+        | Infill overlap up | More bonding into walls | Fill touches or crosses perimeter area |
+
+        For fair comparisons, hold shape, spacing, perimeters, and angle constant.
+        Change only the pattern in **Compare**.
+        """
+    )
+
+with playbook_tabs[1]:
+    st.markdown(
+        """
+        **Perimeters are the shell budget.**
+
+        | Goal | Starting point |
+        |---|---|
+        | Quick demo | 1 perimeter |
+        | Normal FDM part | 2-3 perimeters |
+        | Stronger shell | 4-5 perimeters |
+        | Surface quality review | Slower perimeter speed multiplier |
+
+        If perimeters collapse or disappear, the shape is too small for the count
+        and spacing. Reduce count, reduce spacing, or enlarge the shape.
+        """
+    )
+
+with playbook_tabs[2]:
+    st.markdown(
+        """
+        **Motion tuning is about travel versus print distance.**
+
+        | Control | Use when |
+        |---|---|
+        | Optimize infill order | Travel share is high |
+        | Allow line reversal | Adjacent lines start/end on opposite sides |
+        | Optimize perimeter order | Multiple disconnected loops appear |
+        | Simplify tol. | Imported geometry creates noisy micro-segments |
+        | Min seg. len | Tiny segments clutter Data and Preview |
+
+        Watch **Travel only**, **Speed map**, and **Metrics** after each change.
+        """
+    )
+
+with playbook_tabs[3]:
+    st.markdown(
+        """
+        **SVG and STL import are different workflows.**
+
+        | Import | Best use | Watch for |
+        |---|---|---|
+        | SVG | Clean logos, outlines, flat parts | Open paths, tiny details, multiple shapes |
+        | STL | Cross-section studies | Z height, units, noisy or non-manifold meshes |
+
+        STL files are unitless here. Use **STL target width** to map the mesh into
+        millimeters, then pick a Z slice through the meaningful part of the solid.
+        """
+    )
+
+with playbook_tabs[4]:
+    st.markdown(
+        """
+        **Export is split into review output and guarded machine output.**
+
+        | Export | Use it for | Machine-ready? |
+        |---|---|---|
+        | CSV | Spreadsheet or path audit | No |
+        | SVG | Vector review | No |
+        | JSON | Reproducible parameters and segments | No |
+        | Report | Human summary | No |
+        | Preview G-code | Learning G-code motion | No |
+        | Production G-code | Guarded FDM profile export | Review before use |
+
+        Production G-code can still be wrong for a real printer if temperatures,
+        firmware assumptions, filament, bed prep, or start/end routines do not match.
+        """
+    )
+
+st.divider()
+
+st.header("Experiments That Teach Something", anchor="experiments")
+
+experiments = [
+    (
+        "Pattern efficiency shootout",
+        "Rectangle 80 x 50 mm, 3 perimeters, 3 mm spacing. Compare Parallel, Zigzag, Grid, Honeycomb, and Concentric. Record path efficiency and travel share.",
+        "Which pattern gives the least travel for the same spacing?",
+    ),
+    (
+        "Shell versus fill budget",
+        "Keep spacing fixed at 3 mm. Sweep perimeters from 1 to 5. Watch path length, material, and density near the wall.",
+        "At what point do perimeters dominate the layer?",
+    ),
+    (
+        "Clearance failure test",
+        "Use a 20 mm circle. Raise wall clearance in Advanced mode until infill disappears.",
+        "How much interior width does your fill pattern actually need?",
+    ),
+    (
+        "Import cleanup test",
+        "Load a detailed SVG or STL slice. Compare Data and Preview before and after small simplification.",
+        "Can you reduce segment noise without changing the visible outline?",
+    ),
+    (
+        "Production readiness drill",
+        "Move a centered shape partly outside the build plate, then use Advisor to recover a valid export state.",
+        "Which checks are blockers versus warnings?",
+    ),
+]
+
+for title, setup, question in experiments:
+    expander(
+        title,
+        f"""
+        **Setup:** {setup}
+
+        **Question to answer:** {question}
+
+        **Tabs to use:** Preview, Compare, Metrics, Advisor, Data.
+        """,
+    )
+
+st.divider()
+
+st.header("Data Columns", anchor="data-columns")
 st.markdown(
-    "The sidebar is always visible on the left. Every control there "
-    "immediately regenerates the toolpath and updates all tabs."
+    """
+    The **Data** tab and CSV export share a stable schema.
+
+    | Column | Meaning | How to use it |
+    |---|---|---|
+    | segment_id | 1-based row id | Reference a row in a review |
+    | path_type | boundary, perimeter, or infill | Filter shell versus fill |
+    | order_index | Execution order | Find path-order jumps |
+    | x_start, y_start | Segment start coordinate | Locate travel starts |
+    | x_end, y_end | Segment end coordinate | Locate travel ends |
+    | length_mm | Segment length | Sort for tiny or huge paths |
+    | layer | Layer number | Audit multi-layer exports |
+    """
 )
 
-st.info(
-    "**Basic vs Advanced:** Basic mode keeps the common workflow visible. "
-    "Advanced mode opens placement, preview, and quality controls for deeper experiments.",
-    icon=":material/tune:",
+st.divider()
+
+st.header("Pre-Export Audit", anchor="pre-export-audit")
+
+audit_items = [
+    "Advisor is not Blocked.",
+    "Shape fits inside the active build plate.",
+    "Model height and layer height are correct.",
+    "Nozzle diameter matches the intended process assumption.",
+    "Path efficiency is acceptable for the shape and pattern.",
+    "Data tab does not show suspicious zero-length or tiny segment clutter.",
+    "Production G-code is used only for FDM and only after machine-specific review.",
+]
+
+for item in audit_items:
+    st.checkbox(item, value=False)
+
+st.warning(
+    "MiniSlicer is still a planning and education tool. Treat every export as something to inspect, not something to blindly run."
 )
 
-# ── Shape ─────────────────────────────────────────────────────────────────────
-st.subheader("Shape")
-
-shape_cols = st.columns(2)
-with shape_cols[0]:
-    st.markdown("""
-**Built-in shapes:**
-| Shape | Parameters |
-|---|---|
-| Rectangle | Width, Height |
-| Rounded Rectangle | Width, Height, Corner radius |
-| Circle | Radius |
-| **Ellipse** | Width, Height |
-| Triangle | Base, Height |
-| Regular Polygon | Outer radius, Number of sides (3–16) |
-| Star | Outer radius, Inner radius, Points |
-| **Cross** | Overall size, Arm width |
-| **Capsule** | Width, Height (semicircles on longer side) |
-| **Arrow** | Length, Head width, Shaft width |
-| Custom Polygon | Comma/semicolon coordinate list |
-""")
-with shape_cols[1]:
-    st.markdown("""
-**SVG Import** (via expander at top of sidebar):
-
-Upload any `.svg` file and MiniSlicer will extract the largest polygon from it.
-Use the **Scale to width** field to set its printed size in mm.
-
-Supported SVG elements: `polygon`, `polyline`, `rect`,
-and simple `path` elements using M/L/Z commands.
-
-**STL Import** (same Import expander):
-
-Upload an `.stl` mesh, choose a target slice width, then move the
-**STL slice Z** slider. MiniSlicer cuts a horizontal section through the mesh,
-uses the largest closed loop, and generates perimeters/infill from that 2D slice.
-
-STL files are unitless, so the **STL slice target width** field controls the
-displayed/printed size in millimeters.
-
-**Custom Polygon format:**
-```
-0,0; 50,0; 40,25; 10,35
-```
-At least 3 coordinate pairs, separated by semicolons.
-Decimal points and negative values are allowed.
-""")
-
-# ── Perimeters ────────────────────────────────────────────────────────────────
-st.subheader("Perimeters")
-st.markdown("""
-Perimeters are the **outer shell rings** of the cross-section. Real slicers call them
-*walls* or *shells*. MiniSlicer generates them by repeatedly offsetting the shape boundary inward.
-
-| Parameter | Effect |
-|---|---|
-| **Number of perimeters** | More rings = thicker shell, stronger part, longer print |
-| **Perimeter spacing (mm)** | Distance between rings — typically match your nozzle diameter (0.4 mm) |
-| **Perimeter speed (%)** | Perimeters print slower than infill for better surface quality. 80% is the typical default. Visible in the Speed Map preview mode. |
-
-**Rule of thumb:** 2–3 perimeters for normal parts, 4–5 for mechanical strength.
-Setting spacing significantly larger than your nozzle diameter leaves visible gaps.
-""")
-
-# ── Infill ────────────────────────────────────────────────────────────────────
-st.subheader("Infill")
-st.markdown("""
-Infill fills the interior area with a repeating pattern of lines or cells.
-
-| Parameter | What it does |
-|---|---|
-| **Infill pattern** | The geometric pattern of the fill (see Section 4 for a full breakdown) |
-| **Infill control** | Switch between direct spacing (mm) or percentage density |
-| **Infill spacing (mm)** | Gap between consecutive lines — smaller = denser = stronger |
-| **Infill density (%)** | Derived from nozzle width; 100% = no gaps, 25% = typical |
-| **Infill wall clearance (mm)** | Shrinks the fill region away from the perimeters to avoid overprinting |
-| **Infill-perimeter overlap (mm)** | Grows the infill region back toward perimeters for better bonding. Reduces effective clearance. |
-| **Infill angle (deg)** | Rotates the pattern; −90° to +90° |
-| **Alternating angle** | Odd layers use +45°, even layers use −45° for cross-hatching across layers |
-
-**Tip:** Enable alternating angle when using the 3D View tab — you'll see the
-cross-layer pattern that gives FDM parts their isotropy.
-""")
-
-# ── Process ───────────────────────────────────────────────────────────────────
-st.subheader("Process")
-st.markdown("""
-| Parameter | What it does |
-|---|---|
-| **Layer number** | Which layer to show; affects alternating angle |
-| **Layer height (mm)** | Thickness of one deposited layer — affects volume and weight calculations |
-| **Model height for estimate (mm)** | Total part height used to extrapolate single-layer metrics to a full part |
-| **Print speed (mm/s)** | Nozzle movement speed during extrusion — used to estimate print time |
-
-**Layer height guidance (FDM):**
-- 0.10–0.15 mm — fine quality, slow
-- 0.20 mm — standard balanced
-- 0.28–0.32 mm — fast/draft
-- Never exceed ~75% of your nozzle diameter
-""")
-
-# ── Material ──────────────────────────────────────────────────────────────────
-st.subheader("Material")
-st.markdown("""
-| Parameter | What it does |
-|---|---|
-| **Material** | Sets density for weight calculations. FDM plastics and DED metals available |
-| **Nozzle diameter (mm)** | Controls extrusion cross-section area for volume estimates |
-| **Filament diameter (mm)** | 1.75 mm or 2.85 mm — affects back-calculated filament length |
-| **Material cost ($/kg)** | Used to estimate cost of a full print in the Metrics / Advisor tabs |
-
-**Available materials:**
-
-*FDM Polymers:* PLA (1.24 g/cm³), PETG (1.27), ABS (1.04), TPU (1.21), ASA (1.07)
-
-*DED Metals:* Steel 316L (7.99), Steel H13 (7.76), Titanium Ti-6Al-4V (4.43),
-Inconel 625 (8.44), Aluminum AlSi10Mg (2.67), Copper CuCr1Zr (8.90)
-""")
-
-# ── Display ───────────────────────────────────────────────────────────────────
-st.subheader("Display")
-st.markdown("""
-These only affect what you see — they never change the generated geometry.
-
-| Option | Effect |
-|---|---|
-| **Color scheme** | Classic, Colorblind-safe, Dark (navy), **High Contrast** (bold, presentation-ready), **Neon** (bright on black — eye-catching) |
-| **Line thickness** | Scale factor for rendering line width |
-| **Show outline** | The raw shape boundary (thin grey line) |
-| **Show perimeters** | The inward offset rings (green/teal) |
-| **Show infill** | The fill lines (orange/yellow) |
-| **Show travel moves** | Purple dashed lines for non-printing head moves |
-| **Show seam markers** | Yellow diamond at the start point of each loop |
-| **Show start/end points** | Green (start) and red (end) dots for each path |
-| **Show direction arrows** | Small arrow markers at path midpoints showing which way the nozzle is moving |
-| **Show dimension labels** | Annotates the bounding box with width and height in mm |
-| **Show extrusion width** | Renders paths as thick filled bands to simulate bead width |
-| **Show build plate** | Reference rectangle showing the print bed |
-""")
-
-# ── Path Planning ─────────────────────────────────────────────────────────────
-st.subheader("Path Planning")
-st.markdown("""
-These toggle post-processing of the generated paths to reduce travel distance.
-
-| Option | Effect |
-|---|---|
-| **Optimize perimeter order** | Reorders multiple perimeter loops to minimize hops between them |
-| **Optimize infill order** | Nearest-neighbor sort — picks the closest next line to reduce travel |
-| **Allow reversing infill lines** | If the end of a line is closer than its start, flip it |
-
-**When to enable:** For dense infill or complex shapes, enabling both optimization options
-and line reversal can cut travel distance by 30–50%.
-
-**Trade-off:** Optimization runs an O(n²) nearest-neighbor search. For very dense
-patterns (>200 lines), expect a fraction-of-a-second delay.
-""")
-
-# ── Quality ───────────────────────────────────────────────────────────────────
-st.subheader("Quality")
-st.markdown("""
-| Parameter | Effect |
-|---|---|
-| **Geometry simplify tolerance (mm)** | Removes micro-wiggles from intersection math. Set 0.01–0.05 mm for clean lines without visible quality loss. 0 = disabled |
-| **Minimum segment length (mm)** | Drops extremely short path segments that a real printer wouldn't execute cleanly |
-
-**Tip:** Leave both at 0 unless your infill has odd short stubs or the segment count
-is very high. Start with simplify = 0.01 and minimum length = 0.1 for cleaner exports.
-""")
-
-# ── Transform ─────────────────────────────────────────────────────────────────
-st.subheader("Transform")
-st.markdown("""
-Transforms are applied in this order: scale → mirror → rotate → translate → fit/center.
-
-| Option | Effect |
-|---|---|
-| **Scale shape (%)** | Shrink or grow the shape without changing the sidebar dimensions |
-| **Mirror X / Mirror Y** | Flip the shape horizontally or vertically around its centroid |
-| **Rotate shape (deg)** | Rotate −180° to +180° |
-| **Translate X/Y (mm)** | Shift the shape on the build plate |
-| **Center on build plate** | Moves the centroid to the center of the plate (requires build plate shown) |
-| **Fit inside build plate** | Scales down only if shape is too large; never scales up |
-| **Plate margin (mm)** | Clearance from the plate edge when fitting |
-""")
-
-# ── Motion / Export ───────────────────────────────────────────────────────────
-st.subheader("Motion / Export")
-st.markdown("""
-| Parameter | Effect |
-|---|---|
-| **Travel speed (mm/s)** | Head movement speed when not extruding — used in motion time estimates |
-| **Z-hop during travel (mm)** | Lifts Z before travel moves in G-code export (educational annotation only) |
-| **Include E values in G-code** | Adds a cumulative extrusion value model to G1 commands |
-| **Extrusion per mm (E/mm)** | Scale factor for E value calculation |
-""")
-
 st.divider()
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 4 — Infill Patterns
-# ═══════════════════════════════════════════════════════════════════════════════
-st.header("4 · Infill Patterns — Deep Dive", anchor="infill-patterns-deep-dive")
-
-st.markdown("Each pattern has different trade-offs in strength, print time, and travel distance.")
-
-patterns = {
-    "Parallel Lines": {
-        "icon": "〰️",
-        "description": "The simplest pattern. One family of parallel lines at a constant angle.",
-        "visual": """
-  ///////////
-  ///////////
-  ///////////
-  ///////////
-""",
-        "strengths": "Fastest to generate and print. Minimal path complexity.",
-        "weaknesses": "Anisotropic — strong in one direction only. High travel between lines if unoptimized.",
-        "best_for": "Quick previews, very fast prints, or base layers.",
-    },
-    "Zigzag": {
-        "icon": "⚡",
-        "description": "Same lines as Parallel, but alternating direction: odd lines go left→right, even lines go right→left.",
-        "visual": """
-  →→→→→→→→→→
-  ←←←←←←←←←
-  →→→→→→→→→→
-  ←←←←←←←←←
-""",
-        "strengths": "Cuts travel distance between lines. Same print time as Parallel but fewer travel moves.",
-        "weaknesses": "Slight reversals at ends can create corner bulge artifacts on a real printer.",
-        "best_for": "Default everyday infill. Upgrade from Parallel Lines with almost no cost.",
-    },
-    "Grid": {
-        "icon": "▦",
-        "description": "Two perpendicular families of parallel lines (angle and angle+90°). Creates a cross-hatch.",
-        "visual": """
-  ╪╪╪╪╪╪╪╪╪╪
-  ╪╪╪╪╪╪╪╪╪╪
-  ╪╪╪╪╪╪╪╪╪╪
-""",
-        "strengths": "Isotropic in the layer plane — equal strength in X and Y. Very common default.",
-        "weaknesses": "~2× more lines than Parallel. Intersections may cause slight over-extrusion on real printers.",
-        "best_for": "General purpose parts, functional components requiring balanced strength.",
-    },
-    "Triangles": {
-        "icon": "△",
-        "description": "Three families of lines at 0°, 60°, and 120°. Creates a triangulated mesh.",
-        "visual": """
-  /\\/\\/\\/\\
-  \\/\\/\\/\\/
-  /\\/\\/\\/\\
-""",
-        "strengths": "Excellent isotropy — equal strength in all planar directions. Good for structural parts.",
-        "weaknesses": "~3× lines vs Parallel; longer print time. More complex travel pattern.",
-        "best_for": "Structural parts, load-bearing surfaces where direction is unknown.",
-    },
-    "Honeycomb": {
-        "icon": "⬡",
-        "description": "Hexagonal cell walls. Each cell is a regular hexagon; lines form the shared walls.",
-        "visual": """
-   ___   ___
-  /   \\ /   \\
-  \\   / \\   /
-   ---   ---
-""",
-        "strengths": "Excellent strength-to-weight ratio. Hexagons distribute load efficiently.",
-        "weaknesses": "Most complex to generate. More travel hops between individual wall segments.",
-        "best_for": "Lightweight structural parts, aerospace, anything where weight matters.",
-    },
-    "Concentric": {
-        "icon": "◎",
-        "description": "Rings that offset inward from the shape boundary, like topographic contours.",
-        "visual": """
-  ┌──────────┐
-  │ ┌──────┐ │
-  │ │ ┌──┐ │ │
-  │ │ └──┘ │ │
-  │ └──────┘ │
-  └──────────┘
-""",
-        "strengths": "Follows the shape perfectly. Good surface finish. No sharp direction changes.",
-        "weaknesses": "For non-circular shapes, inner rings get small quickly — low density near the center.",
-        "best_for": "Round parts, aesthetic surfaces, vases, flexible/elastic parts (TPU).",
-    },
-}
-
-for name, info in patterns.items():
-    with st.expander(f"{info['icon']} {name}", expanded=False):
-        left, right = st.columns([2, 1])
-        with left:
-            st.markdown(f"**{info['description']}**")
-            st.markdown(f"**Strengths:** {info['strengths']}")
-            st.markdown(f"**Weaknesses:** {info['weaknesses']}")
-            st.markdown(f"**Best for:** {info['best_for']}")
-        with right:
-            st.code(info["visual"], language=None)
-
-st.divider()
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 5 — Tabs
-# ═══════════════════════════════════════════════════════════════════════════════
-st.header("5 · The Tabs — what each one does", anchor="the-tabs-what-each-one-does")
-
-tab_info = {
-    "Visualization": {
-        "icon": "🗺️",
-        "summary": "The main canvas. Your toolpath rendered as an interactive Plotly chart.",
-        "details": """
-**Layer preview slider** — Scrub through layers up to 20 deep.
-Infill angle alternates automatically when *Alternating angle* is enabled.
-
-**Preview modes:**
-| Mode | Shows |
-|---|---|
-| Toolpath | Everything visible in sidebar Display settings |
-| Perimeters only | Only the shell rings |
-| Infill only | Only the fill lines |
-| Travel only | Only the non-printing head moves (purple dashes) |
-| Extrusion width | Paths rendered as filled bands |
-| Speed map | Color gradient: slower zones darker, faster zones brighter |
-| Time map | Each segment colored by cumulative time |
-| **Path Density** | 2D heatmap showing where material is most concentrated — hot zones = heavy coverage |
-
-**Hover tips:** Hover over any line in the chart to see its exact coordinates,
-length in mm, and estimated time to print.
-
-**Metrics bar** below the chart shows a quick summary without needing to switch tabs.
-""",
-    },
-    "Compare": {
-        "icon": "⚖️",
-        "summary": "Side-by-side comparison of two infill patterns with the same shape and spacing.",
-        "details": """
-1. Pick **Pattern A** (defaults to your current sidebar selection).
-2. Pick **Pattern B** (defaults to Grid).
-3. Click **Compare** — the app generates both patterns and renders them side by side.
-
-Below the chart, a metric table shows:
-- Number of infill lines
-- Total infill length
-- Estimated print time
-- Travel between paths
-
-Pattern B metrics show **delta** vs Pattern A (e.g., `+12.5 mm` or `−3 lines`)
-so you can instantly see what you gain or lose.
-
-**Tip:** Compare Zigzag vs Parallel to see how much travel is saved for free.
-""",
-    },
-    "Animation": {
-        "icon": "▶️",
-        "summary": "Watch the nozzle trace every single segment in order.",
-        "details": """
-Press **▶ Play** inside the Plotly chart, or drag the frame slider manually.
-
-Each frame adds one segment to the canvas — you can watch the nozzle build
-the perimeter shells and then fill the interior.
-
-Sub-sampled to a maximum of **120 frames** for performance.
-Dense infill with 400+ segments will skip some to keep it responsive.
-
-**Use this to:** understand the order segments are visited and spot
-long travel moves between distant paths.
-""",
-    },
-    "3D View": {
-        "icon": "🧊",
-        "summary": "Stack multiple layers into a 3D build-up visualization.",
-        "details": """
-Set how many layers to stack (1–20) then click **Generate 3D View**.
-
-Each layer is offset upward by the layer height. Infill angle alternates ±45°
-per layer automatically, showing the classic cross-hatching that FDM parts use.
-
-The view is a 3D Plotly scatter plot — rotate, zoom, and pan with the mouse.
-
-**Note:** This can be slow for large shapes with many infill lines across 20 layers.
-Start with 5 layers and a simple shape to get a feel for it.
-""",
-    },
-    "Metrics": {
-        "icon": "📊",
-        "summary": "Detailed numeric and visual breakdown of the toolpath statistics.",
-        "details": """
-**Geometry section:** Cross-section area, bounding box, segment count.
-
-**Path Lengths section:** Total, perimeter, and infill lengths.
-
-**Motion Efficiency section:** Travel length, total motion, path efficiency %.
-*Path efficiency = printing moves / (printing + travel moves).*
-Higher is better — 90%+ means very little wasted movement.
-
-**Material Estimate section:** Volume deposited, filament consumed, weight.
-Uses a rectangular extrusion cross-section model:
-`volume = path_length × layer_height × nozzle_diameter`
-
-**Full-Part Estimate section:** Extrapolates the single layer to a full part
-using the *Model height* parameter. Shows total layers, time, weight, and cost.
-
-**Visual Breakdown:** Pie chart of how path length is split between
-perimeters / infill / travel. Bar chart of estimated time breakdown.
-
-**Infill Line Length Distribution:** Histogram showing how uniform or varied
-the individual infill line lengths are. Narrow histogram = uniform pattern.
-""",
-    },
-    "Advisor": {
-        "icon": "💡",
-        "summary": "Automatic checks and recommendations based on your current settings.",
-        "details": """
-MiniSlicer checks several conditions and shows a plain-language tip for each problem found:
-
-- Shape doesn't fit the build plate
-- No infill generated (spacing too large or clearance too tight)
-- High travel ratio (> 25% of motion is non-printing)
-- Low path efficiency (< 80%)
-- Layer height too large for nozzle diameter
-- Missing material cost input
-- Wall clearance too large
-
-If everything looks fine, it says so. No false alarms.
-
-**Quick Stats** at the bottom shows four summary numbers at a glance.
-""",
-    },
-    "Segment Data": {
-        "icon": "🗃️",
-        "summary": "A sortable table of every segment in the toolpath.",
-        "details": """
-Columns:
-| Column | Description |
-|---|---|
-| path_type | `perimeter` or `infill` |
-| order_index | Execution order (0 = first) |
-| x_start, y_start | Segment start coordinate (mm) |
-| x_end, y_end | Segment end coordinate (mm) |
-| length_mm | Euclidean length |
-| layer | Layer number |
-
-Click any column header to sort. Use this to audit path order,
-spot unexpectedly short segments, or understand the data before exporting.
-""",
-    },
-    "Export": {
-        "icon": "💾",
-        "summary": "Download your toolpath in five different formats.",
-        "details": """
-| Format | Use case |
-|---|---|
-| **PNG** | Static raster image of the toolpath (requires `kaleido`: `pip install kaleido`) |
-| **CSV** | Spreadsheet analysis, further processing in Python/Excel |
-| **G-code (educational)** | Study what real G-code looks like. Never send to a real printer |
-| **SVG** | Vector drawing — open in Inkscape or Illustrator |
-| **JSON** | Full session export including all parameters — re-import to reproduce results |
-| **Report (.txt)** | Human-readable summary for documentation or sharing |
-
-**Config Import:** Use the *Config Import (JSON)* expander at the top of the
-sidebar to load a previously exported JSON and restore all settings exactly.
-
-**G-code notes:**
-- Uses simplified G1 linear moves
-- All moves are at the same Z height (2D slice only)
-- E values are approximate if enabled
-- No homing, no temperature, no fan commands
-""",
-    },
-}
-
-for tab_name, info in tab_info.items():
-    with st.expander(f"{info['icon']} {tab_name}", expanded=False):
-        st.markdown(f"**{info['summary']}**")
-        st.markdown(info["details"])
-
-st.divider()
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 6 — Quick Profiles
-# ═══════════════════════════════════════════════════════════════════════════════
-st.header("6 · Quick Profiles", anchor="quick-profiles")
-
-st.markdown(
-    "The **Quick Profiles** expander (just below the page title) sets a bundle of "
-    "recommended parameters in one click. You can still override any value after applying one."
-)
-
-profile_table = {
-    "Fast Preview": ("0.32 mm", "90 mm/s", "1", "6.0 mm", "Rough overview only. Large lines, fast."),
-    "Draft": ("0.28 mm", "70 mm/s", "2", "4.0 mm", "Visible layer lines but fast. Good for iteration."),
-    "Balanced": ("0.20 mm", "50 mm/s", "3", "3.0 mm", "The everyday default. Good balance of quality and speed."),
-    "Strong": ("0.20 mm", "45 mm/s", "5", "2.2 mm", "Dense fill and more shells. Heavier, stronger part."),
-    "Fine": ("0.12 mm", "35 mm/s", "4", "2.0 mm", "Thin layers, high detail, slow print."),
-}
-
-st.markdown("| Profile | Layer height | Speed | Perimeters | Infill spacing | Notes |")
-st.markdown("|---|---|---|---|---|---|")
-for name, (lh, spd, perim, spacing, note) in profile_table.items():
-    st.markdown(f"| **{name}** | {lh} | {spd} | {perim} | {spacing} | {note} |")
-
-st.divider()
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 7 — Import / Export
-# ═══════════════════════════════════════════════════════════════════════════════
-st.header("7 · Importing & Exporting Configs", anchor="importing-exporting-configs")
-
-st.markdown("""
-MiniSlicer can save and restore **all your sidebar parameters** as a single JSON file.
-
-**To save a session:**
-1. Go to the **Export** tab.
-2. Click **Download JSON**.
-3. The file contains a `parameters` object with every setting.
-
-**To restore a session:**
-1. Open the **Config Import (JSON)** expander at the top of the sidebar.
-2. Upload the JSON file.
-3. Tick **Apply imported config overrides**.
-4. All parameters are restored instantly.
-
-**Useful for:**
-- Reproducing the exact same plan later
-- Sharing settings with a colleague
-- A/B testing two setups side-by-side (open two browser tabs, load each JSON)
-
-**SVG Import:**
-- Open the **Import SVG Shape** expander in the sidebar
-- Upload a `.svg` file
-- Set the target width in mm — MiniSlicer scales the shape proportionally
-- Complex SVGs with multiple paths use only the largest detected polygon
-
-**STL Import:**
-- Open the **Import** expander in the sidebar
-- Upload a `.stl` mesh
-- Set **STL slice target width** to scale the unitless mesh into millimeters
-- Move **STL slice Z** to choose the horizontal cross-section
-- MiniSlicer turns that slice into the active 2D shape and runs the normal toolpath workflow
-
-If the selected Z height misses the mesh or creates no closed loop, choose a
-different Z height inside the solid part of the model.
-""")
-
-st.divider()
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 8 — Tips & Common Mistakes
-# ═══════════════════════════════════════════════════════════════════════════════
-st.header("8 · Tips, Tricks & Common Mistakes", anchor="tips-tricks-common-mistakes")
-
-tips_col, mistakes_col = st.columns(2)
-
-with tips_col:
-    st.subheader("Tips & Tricks")
-    st.markdown("""
-**Get more from the Compare tab:**
-Compare Zigzag vs Parallel at the same spacing to instantly see
-how much travel you save with no change to print quality.
-
-**Use the layer slider:**
-In the Visualization tab, scrub the layer slider to watch the infill
-angle alternate. Enable *Alternating angle* first for the full effect.
-
-**Hover over paths:**
-In any Plotly chart, hover over a line to see its exact length and
-estimated time. Useful for finding unexpectedly short or long paths.
-
-**Use Transform to test placement:**
-Set *Show build plate* on, then try *Center on build plate* and
-*Fit inside build plate* to quickly simulate how a part fits.
-
-**Export the report for documentation:**
-The `.txt` report is a quick summary suitable for pasting into
-project notes or sharing with teammates.
-
-**Chain Quick Profiles:**
-Start with Balanced, then manually tighten infill spacing to Strong levels
-to get 5 perimeters with custom density.
-""")
-
-with mistakes_col:
-    st.subheader("Common Mistakes")
-    st.markdown("""
-**Infill spacing too large:**
-If you see "No infill lines generated", reduce spacing.
-For a small shape (e.g. 10 mm circle), spacing of 3 mm may leave no room.
-
-**Wall clearance too aggressive:**
-Setting infill wall clearance larger than half the shape width
-eliminates the fill region entirely. Start at 0 and increase slowly.
-
-**Layer height > nozzle diameter:**
-E.g. layer height 0.5 mm with a 0.4 mm nozzle. The Advisor will flag this.
-A realistic max is ~75% of nozzle diameter.
-
-**Forgetting the build plate:**
-Build plate fit/center options only work when *Show build plate* is checked.
-The options are greyed out when the plate is hidden.
-
-**Taking the G-code export to a real printer:**
-The G-code is for education only. It has no temperature, homing,
-or calibration commands. Never run it on real hardware.
-
-**Comparing patterns at different spacings:**
-The Compare tab uses the same spacing for both patterns.
-If you want a fair comparison, leave spacing unchanged between tests.
-""")
-
-st.divider()
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 9 — Glossary
-# ═══════════════════════════════════════════════════════════════════════════════
-st.header("9 · Glossary", anchor="glossary")
+st.header("Glossary", anchor="glossary")
 
 glossary = {
-    "Perimeter (Wall / Shell)": "An offset ring of the shape outline. Multiple perimeters form the outer shell of a printed part.",
-    "Infill": "Lines or patterns that fill the solid interior area of a cross-section.",
-    "Toolpath": "The complete ordered sequence of movements (printing and travel) the nozzle makes on one layer.",
-    "Segment": "One straight line between two adjacent toolpath points. A path is made of many segments.",
-    "Travel move": "A non-printing head movement — nozzle moves to the start of the next path without extruding material.",
-    "Path efficiency": "Ratio of printing distance to total motion distance. Higher = less wasted travel.",
-    "Layer height": "Thickness of one deposited material layer. Controls vertical resolution and print speed.",
-    "Nozzle diameter": "Opening diameter of the extrusion nozzle. Controls minimum feature size and extrusion width.",
-    "FDM": "Fused Deposition Modelling — melts and extrudes thermoplastic filament layer by layer.",
-    "DED": "Directed Energy Deposition — melts metal wire or powder using a high-energy source (laser or arc). Used for metal printing.",
-    "Bounding Box": "The smallest axis-aligned rectangle that contains the entire shape.",
-    "Seam": "The point where a closed perimeter loop starts and ends. Often visible as a small mark on real prints.",
-    "Z-hop": "A small upward lift before a travel move to avoid scraping previously deposited material.",
-    "Path order optimization": "Reordering paths using nearest-neighbor heuristics to minimize total travel distance.",
-    "Geometry simplification": "Removing micro-vertices from intersection-generated paths to reduce data size.",
-    "Extrusion cross-section": "The shape of deposited material (approximately rectangular: nozzle_diameter × layer_height).",
+    "Boundary": "The original outline of the selected or imported shape.",
+    "Perimeter": "An inward shell path. Real slicers often call these walls or shells.",
+    "Infill": "The internal path pattern that fills the cross-section.",
+    "Travel move": "A non-printing move between print paths.",
+    "Path efficiency": "Printed distance divided by total motion distance. Higher means less travel waste.",
+    "Layer height": "Vertical thickness used for material and full-build estimates.",
+    "Nozzle diameter": "The assumed extrusion width used for density and volume calculations.",
+    "Wall clearance": "How far infill is pulled away from perimeters before overlap is applied.",
+    "Seam": "Start/end location for a closed perimeter loop.",
+    "Z-hop": "Temporary Z lift before travel moves in exported G-code.",
+    "Readiness": "The app's automated score based on fit, paths, material, and motion checks.",
+    "Production export": "Guarded FDM G-code path with machine profile checks. It still requires human review.",
 }
 
-gcol1, gcol2 = st.columns(2)
+g1, g2 = st.columns(2)
 items = list(glossary.items())
-half = len(items) // 2
-
-with gcol1:
-    for term, definition in items[:half]:
-        st.markdown(f"**{term}**")
-        st.caption(definition)
-
-with gcol2:
-    for term, definition in items[half:]:
-        st.markdown(f"**{term}**")
-        st.caption(definition)
-
-st.divider()
+for term, definition in items[: len(items) // 2]:
+    g1.markdown(f"**{term}**")
+    g1.caption(definition)
+for term, definition in items[len(items) // 2 :]:
+    g2.markdown(f"**{term}**")
+    g2.caption(definition)
 
 st.success(
-    "You've read the full tutorial. Head back to **MiniSlicer — Toolpath Planner** "
-    "from the sidebar and start experimenting. "
-    "There is no better way to learn than adjusting parameters and watching what changes.",
-    icon="🎓",
+    "Use this page like a lab notebook: pick a goal, run one experiment, record the metrics, then change one control."
 )
-st.caption("MiniSlicer — Educational toolpath visualizer · Not machine-ready output")

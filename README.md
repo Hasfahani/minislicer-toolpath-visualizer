@@ -26,15 +26,18 @@ The app opens at `http://localhost:8501`.
 | Area | What it does |
 |---|---|
 | **Shapes / Imports** | 11 built-in shapes (Rectangle, Rounded Rectangle, Circle, Ellipse, Triangle, Regular Polygon, Star, Cross, Capsule, Arrow, Custom Polygon), plus SVG outlines and STL mesh slicing |
+| **Multi-layer STL** | Slice an STL across a Z range with configurable step; generates per-layer toolpaths and renders an animated 3D build-up with play/pause and a layer slider |
 | **Perimeters** | Inward offset rings using Shapely negative buffer; configurable count and spacing |
-| **Infill** | Parallel/grid/concentric modes, custom angle slider, optional alternating angle, or density-based spacing |
+| **Infill** | Parallel/grid/concentric/honeycomb/zigzag/triangles modes, custom angle slider, optional alternating angle, or density-based spacing |
 | **Visualization** | 8 preview modes: Toolpath, Extrusion, Perimeters only, Infill only, Travel only, Speed map, Time map, and Path Density |
-| **Metrics** | Path length, segment count, perimeter and infill counts, estimated print time, bounding box |
-| **Path planning** | Optional nearest-neighbour ordering for perimeters and infill, with travel-distance estimate |
+| **Metrics** | Path length, segment count, perimeter and infill counts, estimated print time, bounding box, material volume and weight |
+| **Path planning** | Greedy nearest-neighbour ordering for perimeters and infill; before/after travel-distance comparison shown in the Metrics tab |
+| **Material profiles** | 6 built-in printer presets (PLA FDM, PETG FDM, ABS FDM, 316L LPBF, Ti-6Al-4V LPBF, Inconel 625 LPBF) that pre-fill speed, layer height, hatch spacing, and material |
 | **Transforms** | Scale, mirror, rotate, translate, center, and fit shapes to a configurable build plate |
 | **Quality controls** | Geometry simplification tolerance and minimum segment-length filtering |
 | **Reproducibility** | Import prior run settings from JSON and re-apply parameter snapshots |
 | **Motion realism** | Separate travel speed, optional Z-hop, and optional E-value output in educational G-code |
+| **UI** | Dark/light theme toggle, sidebar setup-progress indicator, inline G-code preview with copy button |
 | **Export** | CSV, SVG, JSON (with parameters), G-code-like educational text, and PNG image |
 
 ---
@@ -143,14 +146,20 @@ minislicer-toolpath-visualizer/
 │   ├── __init__.py
 │   ├── geometry.py         # Shape creation and polygon validation
 │   ├── toolpaths.py        # Perimeter and infill generation, Segment dataclass
-│   ├── metrics.py          # Path length, print-time estimate, bounding box
-│   ├── stl_import.py       # STL mesh metadata and Z-slice extraction
-│   ├── exporters.py        # CSV and G-code-like text export
-│   └── plotting.py         # Plotly figure builder
+│   ├── metrics.py          # Path length, print-time estimate, bounding box, material
+│   ├── profiles.py         # Printer material presets (FDM + LPBF)
+│   ├── stl_import.py       # STL metadata, single-Z and multi-layer slice extraction
+│   ├── exporters.py        # CSV, SVG, JSON, and G-code-like text export
+│   ├── plotting.py         # Plotly 2D/3D figure builders incl. multi-layer animation
+│   ├── animation.py        # Nozzle-path playback animation
+│   └── svg_import.py       # SVG outline → Shapely polygon
 ├── tests/
-│   ├── test_geometry.py
-│   ├── test_toolpaths.py
-│   └── test_exporters.py
+│   ├── test_geometry.py    # Shape creation and validation
+│   ├── test_toolpaths.py   # Perimeter/infill generation and path ordering
+│   ├── test_exporters.py   # CSV, JSON, G-code export
+│   ├── test_metrics.py     # Path length, print time, material estimate
+│   ├── test_plotting.py    # Figure structure and trace types
+│   └── test_stl_import.py  # STL slicing with trimesh mock mesh
 └── screenshots/
     └── .gitkeep
 ```
@@ -178,11 +187,10 @@ This project was built to practice and demonstrate:
 ## Future Improvements
 
 - **Support structure generation** — detect overhangs and add basic support geometry
-- **Real printer profiles** — machine-specific feedrate, layer height, and material presets
 - **Thermal constraint awareness** — flag regions with high local heat accumulation (relevant
   for metal powder-bed processes)
-- **Multi-layer simulation** — render a full build volume with layer-stacking animation
 - **True G-code output** — validated, machine-ready output with proper start/end sequences
+- **Multi-material / multi-nozzle** — assign different materials to perimeter vs. infill regions
 
 ---
 

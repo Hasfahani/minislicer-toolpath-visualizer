@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import io
 import json
+from hashlib import sha256
 
 import pandas as pd
 from shapely.geometry import LineString
 
+from src.profiles import MachineGcodeProfile
 from src.toolpaths import Segment
 
 CSV_COLUMNS = [
@@ -21,6 +23,10 @@ CSV_COLUMNS = [
     "length_mm",
     "layer",
 ]
+
+
+class ProductionExportError(ValueError):
+    """Raised when a toolpath is not safe to export as production G-code."""
 
 
 def segments_to_dataframe(segments: list[Segment]) -> pd.DataFrame:
@@ -118,6 +124,133 @@ def export_gcode_like(
 
     buffer.write("\nM2 ; end of program\n")
     return buffer.getvalue()
+
+
+def export_production_gcode(
+    segments: list[Segment],
+    machine: MachineGcodeProfile,
+    print_speed_mm_s: float,
+    layer_height_mm: float,
+    travel_speed_mm_s: float,
+    extrusion_per_mm: float,
+    z_hop_mm: float = 0.0,
+    job_name: str = "MiniSlicer job",
+) -> str:
+    """Export guarded FDM G-code using a concrete machine profile.
+
+    This path is intentionally stricter than ``export_gcode_like``: it refuses
+    empty jobs, out-of-bounds motion, non-positive extrusion, and invalid layer
+    heights before writing temperature, homing, purge, fan, and shutdown code.
+    """
+    _validate_production_gcode_inputs(
+        segments=segments,
+        machine=machine,
+        layer_height_mm=layer_height_mm,
+        extrusion_per_mm=extrusion_per_mm,
+    )
+
+    feed_rate_mm_min = max(print_speed_mm_s, 0.1) * 60.0
+    travel_feed_rate_mm_min = max(travel_speed_mm_s, 0.1) * 60.0
+    safe_z = min(machine.max_z_mm, max((seg.layer + 1) * layer_height_mm for seg in segments) + 5.0)
+    park_y = min(machine.bed_size_y_mm, max(0.0, machine.bed_size_y_mm - 5.0))
+
+    buffer = io.StringIO()
+    buffer.write("; MiniSlicer production FDM export\n")
+    buffer.write(f"; Job: {job_name}\n")
+    buffer.write(f"; Machine: {machine.name}\n")
+    buffer.write(f"; Layers: {len({seg.layer for seg in segments})}\n")
+    buffer.write(f"; Segments: {len(segments)}\n")
+    buffer.write(f"; Toolpath-SHA256: {_segments_digest(segments)}\n")
+    buffer.write("; Review machine, filament, and bed preparation before running.\n")
+    for line in machine.start_gcode:
+        buffer.write(line.format(
+            bed_temp=machine.bed_temp_c,
+            nozzle_temp=machine.nozzle_temp_c,
+            safe_z=safe_z,
+            park_y=park_y,
+        ) + "\n")
+    if machine.fan_speed > 0:
+        buffer.write(f"M106 S{machine.fan_speed} ; part cooling fan\n")
+    buffer.write(f"G1 F{feed_rate_mm_min:.1f} ; print feed rate\n")
+    buffer.write(f"G0 F{travel_feed_rate_mm_min:.1f} ; travel feed rate\n")
+    buffer.write("\n")
+
+    e_position = 0.0
+    current_layer = None
+    current_type = None
+    for seg in segments:
+        layer_z = max(layer_height_mm, seg.layer * layer_height_mm)
+        if seg.layer != current_layer:
+            current_layer = seg.layer
+            current_type = None
+            buffer.write(f";LAYER:{seg.layer}\n")
+            buffer.write(f"G1 Z{layer_z:.3f} F3000\n")
+        if seg.path_type != current_type:
+            current_type = seg.path_type
+            buffer.write(f";TYPE:{seg.path_type.upper()}\n")
+
+        if z_hop_mm > 0:
+            buffer.write(f"G0 Z{min(layer_z + z_hop_mm, machine.max_z_mm):.3f} F3000 ; z-hop\n")
+        buffer.write(
+            f"G0 X{seg.x_start:.3f} Y{seg.y_start:.3f} F{travel_feed_rate_mm_min:.1f}\n"
+        )
+        if z_hop_mm > 0:
+            buffer.write(f"G0 Z{layer_z:.3f} F3000\n")
+        e_position += max(0.0, seg.length_mm) * extrusion_per_mm
+        buffer.write(
+            f"G1 X{seg.x_end:.3f} Y{seg.y_end:.3f} "
+            f"E{e_position:.5f} F{feed_rate_mm_min:.1f}\n"
+        )
+
+    buffer.write("\n")
+    for line in machine.end_gcode:
+        buffer.write(line.format(
+            bed_temp=machine.bed_temp_c,
+            nozzle_temp=machine.nozzle_temp_c,
+            safe_z=safe_z,
+            park_y=park_y,
+        ) + "\n")
+    return buffer.getvalue()
+
+
+def _validate_production_gcode_inputs(
+    *,
+    segments: list[Segment],
+    machine: MachineGcodeProfile,
+    layer_height_mm: float,
+    extrusion_per_mm: float,
+) -> None:
+    if not segments:
+        raise ProductionExportError("Cannot export production G-code without toolpath segments.")
+    if layer_height_mm <= 0:
+        raise ProductionExportError("Layer height must be positive.")
+    if extrusion_per_mm <= 0:
+        raise ProductionExportError("Extrusion per millimeter must be positive.")
+
+    for seg in segments:
+        if seg.length_mm <= 0:
+            raise ProductionExportError("Production G-code cannot contain zero-length moves.")
+        for x, y in ((seg.x_start, seg.y_start), (seg.x_end, seg.y_end)):
+            if x < 0 or y < 0 or x > machine.bed_size_x_mm or y > machine.bed_size_y_mm:
+                raise ProductionExportError(
+                    f"Move ({x:.3f}, {y:.3f}) is outside {machine.name} build area."
+                )
+        if seg.layer * layer_height_mm > machine.max_z_mm:
+            raise ProductionExportError(
+                f"Layer {seg.layer} exceeds {machine.name} maximum Z height."
+            )
+
+
+def _segments_digest(segments: list[Segment]) -> str:
+    digest = sha256()
+    for seg in segments:
+        digest.update(
+            (
+                f"{seg.layer}|{seg.path_type}|{seg.x_start:.5f}|{seg.y_start:.5f}|"
+                f"{seg.x_end:.5f}|{seg.y_end:.5f}|{seg.length_mm:.5f}\n"
+            ).encode("utf-8")
+        )
+    return digest.hexdigest()
 
 
 def export_svg(
