@@ -31,6 +31,8 @@ def render_export_panel(
     include_e: bool,
     extrusion_per_mm: float,
     report: str,
+    dossier_md: str,
+    dossier_html: str,
     layer_number: int,
 ) -> None:
     csv_text = export_segments_csv(segments)
@@ -74,8 +76,8 @@ def render_export_panel(
         width="stretch", help="Full segment data with parameters as JSON.",
     )
     d5.download_button(
-        "Report", report, f"toolpaths_{fname}_report.txt", "text/plain",
-        width="stretch", help="Human-readable summary report.",
+        "Dossier", dossier_md, f"toolpaths_{fname}_dossier.md", "text/markdown",
+        width="stretch", help="Company-facing manufacturing dossier with readiness, cost, and KPI summary.",
     )
     machine_name = d6.selectbox("Machine", sorted(FDM_MACHINE_PROFILES), label_visibility="collapsed")
 
@@ -122,6 +124,24 @@ def render_export_panel(
         help="Machine-profiled FDM G-code with start/end sequence, temperatures, fan, extrusion, and bounds checks.",
     )
 
+    dx1, dx2 = st.columns(2)
+    dx1.download_button(
+        "Legacy Text Report",
+        report,
+        f"toolpaths_{fname}_report.txt",
+        "text/plain",
+        width="stretch",
+        help="Plain engineering summary for quick review.",
+    )
+    dx2.download_button(
+        "HTML Job Dossier",
+        dossier_html,
+        f"toolpaths_{fname}_dossier.html",
+        "text/html",
+        width="stretch",
+        help="Standalone dossier for customer or internal sign-off packages.",
+    )
+
     st.markdown("---")
     col_gc, col_prod, col_js = st.columns(3)
     with col_gc:
@@ -133,3 +153,6 @@ def render_export_panel(
     with col_js:
         with st.expander("JSON preview"):
             st.code(json_text[:4000], language="json")
+
+    with st.expander("Job dossier preview", expanded=True):
+        st.markdown(dossier_md)

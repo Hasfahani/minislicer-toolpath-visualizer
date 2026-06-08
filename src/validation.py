@@ -31,6 +31,9 @@ def assess_job_readiness(
     process_mode: str,
     imported_stl: bool,
     imported_svg: bool,
+    volumetric_flow_mm3_s: float | None = None,
+    model_height_mm: float | None = None,
+    layer_count: int | None = None,
 ) -> dict[str, Any]:
     """Return a readiness score, grade, and actionable findings for a job."""
     issues: list[ReadinessIssue] = []
@@ -66,6 +69,22 @@ def assess_job_readiness(
             f"Layer height is {layer_height_mm:.2f} mm for a {nozzle_diameter_mm:.2f} mm nozzle.",
             "Use a layer height at or below 80% of nozzle diameter for a safer preview.",
         ))
+
+    if volumetric_flow_mm3_s is not None:
+        if process_mode.startswith("FDM") and volumetric_flow_mm3_s > 14.0:
+            issues.append(ReadinessIssue(
+                "warning",
+                "High volumetric flow",
+                f"Requested flow is {volumetric_flow_mm3_s:.1f} mm3/s.",
+                "Reduce speed, layer height, or nozzle width unless the hotend is validated for this flow.",
+            ))
+        elif process_mode.startswith("FDM") and volumetric_flow_mm3_s > 10.0:
+            issues.append(ReadinessIssue(
+                "info",
+                "Elevated volumetric flow",
+                f"Requested flow is {volumetric_flow_mm3_s:.1f} mm3/s.",
+                "Confirm filament and hotend can sustain the selected flow rate.",
+            ))
 
     if effective_spacing_mm > nozzle_diameter_mm * 12:
         issues.append(ReadinessIssue(
@@ -111,6 +130,22 @@ def assess_job_readiness(
             "Dense preview",
             f"This layer has {segment_count:,} segments.",
             "Use the data tab and simplification controls if interaction becomes slow.",
+        ))
+
+    if layer_count is not None and layer_count > 1200:
+        issues.append(ReadinessIssue(
+            "warning",
+            "Long layer stack",
+            f"The build has {layer_count:,} layers.",
+            "Review layer height and model height before committing machine time.",
+        ))
+
+    if model_height_mm is not None and process_mode.startswith("FDM") and model_height_mm > 220:
+        issues.append(ReadinessIssue(
+            "info",
+            "Tall FDM build",
+            f"Model height is {model_height_mm:.1f} mm.",
+            "Confirm printer Z capacity, enclosure stability, and collision clearance.",
         ))
 
     if process_mode.startswith("DED") and not imported_stl:

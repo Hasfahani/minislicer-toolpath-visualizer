@@ -26,6 +26,12 @@ from src.geometry import (
     parse_custom_polygon,
     validate_polygon,
 )
+from src.job_analysis import (
+    classify_program_risk,
+    estimate_job_economics,
+    generate_job_dossier_html,
+    generate_job_dossier_markdown,
+)
 from src.metrics import summarize_metrics
 from src.plotting import (
     create_comparison_figure,
@@ -192,6 +198,19 @@ def app_css() -> None:
             border: 1px solid rgba(94,234,212,0.28); border-radius: 6px;
             padding: 0.25rem 0.75rem; font-size: 0.75rem; color: #ccfbf1; white-space: nowrap;
         }
+        .exec-strip {
+            display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem;
+            margin: 0.2rem 0 0.9rem;
+        }
+        .exec-card {
+            background: #ffffff; border: 1px solid var(--ms-line); border-radius: 8px;
+            padding: 0.85rem 0.95rem; min-height: 5.4rem;
+        }
+        .exec-label { color: var(--ms-muted); font-size: 0.76rem; font-weight: 650; margin-bottom: 0.25rem; }
+        .exec-value { color: var(--ms-ink); font-size: 1.35rem; font-weight: 760; line-height: 1.2; }
+        .exec-note { color: var(--ms-muted); font-size: 0.78rem; margin-top: 0.25rem; }
+        @media (max-width: 980px) { .exec-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 640px) { .exec-strip { grid-template-columns: 1fr; } }
         [data-testid="stSidebar"] { border-right: 1px solid var(--ms-line); background: var(--ms-surface); }
         [data-testid="stMetric"] {
             background: var(--ms-panel); border: 1px solid var(--ms-line); border-radius: 8px;
@@ -389,6 +408,16 @@ if layer_count <= production_layer_limit:
 full_time_s = metrics["estimated_motion_time_s"] * layer_count
 full_weight_g = metrics["weight_g"] * layer_count
 full_cost = full_weight_g / 1000.0 * float(material_cost)
+economics = estimate_job_economics(
+    metrics=metrics,
+    layer_count=layer_count,
+    layer_height_mm=float(layer_height),
+    nozzle_diameter_mm=float(nozzle_diameter),
+    print_speed_mm_s=float(print_speed),
+    full_time_s=full_time_s,
+    full_weight_g=full_weight_g,
+    material_cost_per_kg=float(material_cost),
+)
 min_x, min_y, max_x, max_y = shape.bounds
 fits_plate = not show_plate or (min_x >= 0 and min_y >= 0 and max_x <= plate_w and max_y <= plate_d)
 travel_ratio = (
@@ -411,7 +440,11 @@ readiness = assess_job_readiness(
     process_mode=str(process_mode),
     imported_stl=uploaded_stl is not None,
     imported_svg=uploaded_svg is not None,
+    volumetric_flow_mm3_s=economics["volumetric_flow_mm3_s"],
+    model_height_mm=float(model_height),
+    layer_count=layer_count,
 )
+program_risk = classify_program_risk(readiness, economics)
 
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 metric_specs = [
@@ -471,9 +504,88 @@ elif readiness["warnings"]:
 else:
     st.success(f"Job readiness: {readiness['score']}/100 - setup is ready for planning review.")
 
-tab_preview, tab_compare, tab_anim, tab_3d, tab_metrics, tab_advisor, tab_data, tab_export = st.tabs([
-    "Preview", "Compare", "Animation", "3D", "Metrics", "Advisor", "Data", "Export",
+tab_exec, tab_preview, tab_compare, tab_anim, tab_3d, tab_metrics, tab_advisor, tab_data, tab_export = st.tabs([
+    "Executive", "Preview", "Compare", "Animation", "3D", "Metrics", "Advisor", "Data", "Export",
 ])
+
+with tab_exec:
+    risk_color = {"Low": "#15803d", "Medium": "#b45309", "High": "#b91c1c", "Blocked": "#991b1b"}.get(
+        program_risk, "#172033"
+    )
+    st.markdown(
+        f"""
+        <div class="exec-strip">
+            <div class="exec-card">
+                <div class="exec-label">Release State</div>
+                <div class="exec-value">{escape(readiness["status"])} - {readiness["score"]}/100</div>
+                <div class="exec-note">{readiness["blockers"]} blockers, {readiness["warnings"]} warnings</div>
+            </div>
+            <div class="exec-card">
+                <div class="exec-label">Quoted Part Cost</div>
+                <div class="exec-value">${economics["quoted_price"]:.2f}</div>
+                <div class="exec-note">${economics["cost_per_cm3"]:.2f}/cm3 including scrap and margin</div>
+            </div>
+            <div class="exec-card">
+                <div class="exec-label">Build Productivity</div>
+                <div class="exec-value">{economics["build_rate_cm3_h"]:.2f} cm3/h</div>
+                <div class="exec-note">{fmt_time(full_time_s)} machine time</div>
+            </div>
+            <div class="exec-card">
+                <div class="exec-label">Program Risk</div>
+                <div class="exec-value" style="color:{risk_color}">{escape(program_risk)}</div>
+                <div class="exec-note">{economics["volumetric_flow_mm3_s"]:.2f} mm3/s requested flow</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    ex1, ex2 = st.columns([1.2, 1])
+    with ex1:
+        st.markdown("### Production Decision")
+        decision_rows = {
+            "Geometry": source_label,
+            "Process": process_mode,
+            "Material": material_choice,
+            "Layers": layer_count,
+            "Path efficiency": f"{metrics['path_efficiency_pct']:.1f}%",
+            "Travel share": f"{travel_ratio:.1f}%",
+            "Material volume": f"{economics['volume_cm3']:.2f} cm3",
+            "Full segment export": f"{len(production_segments):,} moves",
+        }
+        st.dataframe(
+            [{"signal": key, "value": value} for key, value in decision_rows.items()],
+            hide_index=True,
+            width="stretch",
+        )
+    with ex2:
+        st.markdown("### Cost Stack")
+        st.bar_chart({
+            "USD": {
+                "Material": economics["material_cost"],
+                "Machine": economics["machine_cost"],
+                "Labor": economics["labor_cost"],
+                "Scrap + margin": max(
+                    0.0,
+                    economics["quoted_price"]
+                    - economics["material_cost"]
+                    - economics["machine_cost"]
+                    - economics["labor_cost"],
+                ),
+            }
+        })
+
+    st.markdown("### Top Actions")
+    if readiness["issues"]:
+        for issue in readiness["issues"][:4]:
+            if issue.severity == "blocker":
+                st.error(f"{issue.title}: {issue.action}")
+            elif issue.severity == "warning":
+                st.warning(f"{issue.title}: {issue.action}")
+            else:
+                st.info(f"{issue.title}: {issue.action}")
+    else:
+        st.success("This setup is clear for planning review. Export the job dossier for sign-off.")
 
 with tab_preview:
     ctrl_row = st.columns([2, 1, 1])
@@ -704,6 +816,8 @@ with tab_export:
         "plate": {"enabled": bool(show_plate), "width_mm": float(plate_w), "depth_mm": float(plate_d)},
         "placement": placement,
         "readiness": readiness_to_dict(readiness),
+        "economics": economics,
+        "program_risk": program_risk,
         "production_export": {
             "layer_count": int(layer_count),
             "segment_count": len(production_segments),
@@ -745,6 +859,18 @@ with tab_export:
         "",
         "Planning output only - validate machine-specific start/end code and process limits before production.",
     ])
+    dossier_md = generate_job_dossier_markdown(
+        job_name=source_label,
+        params=params,
+        metrics=metrics,
+        readiness=readiness,
+        economics=economics,
+        full_time_text=fmt_time(full_time_s),
+        full_weight_g=full_weight_g,
+        layer_count=layer_count,
+        risk=program_risk,
+    )
+    dossier_html = generate_job_dossier_html(dossier_md)
     render_export_panel(
         segments,
         production_segments,
@@ -759,5 +885,7 @@ with tab_export:
         bool(include_e),
         float(extrusion_per_mm),
         report,
+        dossier_md,
+        dossier_html,
         int(layer_number),
     )
