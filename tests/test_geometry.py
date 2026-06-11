@@ -22,7 +22,7 @@ from src.geometry import (
 )
 
 
-# ── Shape creation ────────────────────────────────────────────────────────────
+# -- Shape creation ------------------------------------------------------------
 
 def test_basic_shapes_are_valid() -> None:
     assert create_rectangle(20.0, 10.0).is_valid
@@ -51,7 +51,7 @@ def test_circle_area_approximate() -> None:
 
 
 def test_circle_vertex_count_respects_n_vertices() -> None:
-    # n_vertices=12 → quad_segs=3 → 12 boundary vertices + closure
+    # n_vertices=12 -> quad_segs=3 -> 12 boundary vertices + closure
     circ = create_circle(10.0, n_vertices=12)
     # Shapely closes the ring, so coords count = n_vertices + 1
     assert len(circ.exterior.coords) == 13
@@ -71,7 +71,7 @@ def test_circle_rejects_too_few_vertices() -> None:
 
 def test_triangle_has_three_exterior_coords() -> None:
     tri = create_triangle(20.0, 10.0)
-    # Shapely closes the ring: first coord == last coord → 4 entries
+    # Shapely closes the ring: first coord == last coord -> 4 entries
     assert len(tri.exterior.coords) == 4
 
 
@@ -101,7 +101,7 @@ def test_rounded_rectangle_respects_bounds() -> None:
     assert bb.height == pytest.approx(20.0)
 
 
-# ── Polygon validation ────────────────────────────────────────────────────────
+# -- Polygon validation --------------------------------------------------------
 
 def test_validate_polygon_rejects_empty() -> None:
     assert validate_polygon(Polygon()) is None
@@ -113,13 +113,13 @@ def test_validate_polygon_passes_valid() -> None:
 
 
 def test_custom_polygon_self_intersecting_repaired_or_none() -> None:
-    # Bowtie (figure-8) — self-intersecting; must either be repaired or rejected
+    # Bowtie (figure-8) - self-intersecting; must either be repaired or rejected
     poly = parse_custom_polygon("0,0; 10,10; 10,0; 0,10")
     if poly is not None:
         assert poly.is_valid, "Repaired polygon must be valid"
 
 
-# ── Custom polygon parsing ────────────────────────────────────────────────────
+# -- Custom polygon parsing ----------------------------------------------------
 
 def test_custom_polygon_parsing_success() -> None:
     poly = parse_custom_polygon("0,0; 10,0; 10,10; 0,10")
@@ -160,7 +160,7 @@ def test_custom_polygon_newline_whitespace_tolerated() -> None:
     assert isinstance(poly, Polygon)
 
 
-# ── Bounding box ──────────────────────────────────────────────────────────────
+# -- Bounding box --------------------------------------------------------------
 
 def test_bounding_box_returns_named_tuple() -> None:
     bb = bounding_box(create_rectangle(40.0, 25.0))
@@ -176,7 +176,7 @@ def test_bounding_box_dimensions_alias() -> None:
     assert bb.height == 5.0
 
 
-# ── Geometry utilities ────────────────────────────────────────────────────────
+# -- Geometry utilities --------------------------------------------------------
 
 def test_polygon_area_rectangle() -> None:
     area = polygon_area(create_rectangle(10.0, 4.0))

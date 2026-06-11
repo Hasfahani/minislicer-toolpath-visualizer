@@ -23,7 +23,7 @@ def create_animated_figure(
 ) -> go.Figure:
     """Build a Plotly figure with play/pause nozzle animation.
 
-    Animation runs entirely in the browser — no Python round-trips needed.
+    Animation runs entirely in the browser - no Python round-trips needed.
     Automatically sub-samples to at most _MAX_FRAMES frames for performance.
     """
     bx, by = boundary.xy
@@ -134,7 +134,7 @@ def create_animated_figure(
                 yanchor="top",
                 buttons=[
                     dict(
-                        label="▶  Play",
+                        label="Play",
                         method="animate",
                         args=[
                             None,
@@ -144,7 +144,7 @@ def create_animated_figure(
                         ],
                     ),
                     dict(
-                        label="⏸  Pause",
+                        label="Pause",
                         method="animate",
                         args=[
                             [None],

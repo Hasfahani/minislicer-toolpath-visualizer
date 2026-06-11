@@ -92,7 +92,7 @@ def slice_stl_multi_layer(
     return results
 
 
-# ── Internal helpers ──────────────────────────────────────────────────────────
+# -- Internal helpers ----------------------------------------------------------
 
 def _slice_mesh_at_z(
     mesh,

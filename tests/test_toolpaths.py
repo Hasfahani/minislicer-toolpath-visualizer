@@ -27,7 +27,7 @@ def test_perimeters_generated_for_large_shape() -> None:
 
 
 def test_perimeters_count_limited_by_shape_size() -> None:
-    # Tiny shape — cannot fit 10 perimeters at 5mm spacing
+    # Tiny shape - cannot fit 10 perimeters at 5mm spacing
     shape = create_rectangle(4.0, 4.0)
     perimeters = generate_inward_perimeters(shape, count=10, spacing=5.0)
     assert len(perimeters) < 10

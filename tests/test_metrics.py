@@ -1,4 +1,4 @@
-"""Tests for src/metrics.py — path length, print time, bounding box, material estimate."""
+"""Tests for src/metrics.py - path length, print time, bounding box, material estimate."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from src.toolpaths import (
 )
 
 
-# ── Fixtures ──────────────────────────────────────────────────────────────────
+# -- Fixtures ------------------------------------------------------------------
 
 def _make_segments() -> list[Segment]:
     return [
@@ -35,7 +35,7 @@ def _make_segments() -> list[Segment]:
 
 
 def _rect_segments(layer: int = 1) -> tuple:
-    """Return (shape, boundary, perimeters, infill, segments) for a 20×10 rectangle."""
+    """Return (shape, boundary, perimeters, infill, segments) for a 20x10 rectangle."""
     shape = create_rectangle(20.0, 10.0)
     boundary = shape_boundary(shape)
     perimeters = generate_inward_perimeters(shape, count=2, spacing=1.0)
@@ -44,7 +44,7 @@ def _rect_segments(layer: int = 1) -> tuple:
     return shape, boundary, perimeters, infill, segments
 
 
-# ── total_path_length ─────────────────────────────────────────────────────────
+# -- total_path_length ---------------------------------------------------------
 
 def test_total_path_length_sums_segment_lengths() -> None:
     segs = _make_segments()
@@ -70,10 +70,10 @@ def test_total_path_length_increases_with_more_segments() -> None:
     assert total_path_length(seg_many) > total_path_length(seg_few)
 
 
-# ── estimate_print_time_seconds ────────────────────────────────────────────────
+# -- estimate_print_time_seconds ------------------------------------------------
 
 def test_print_time_basic_formula() -> None:
-    # 100 mm at 10 mm/s → 10 s
+    # 100 mm at 10 mm/s -> 10 s
     assert estimate_print_time_seconds(100.0, 10.0) == pytest.approx(10.0)
 
 
@@ -101,7 +101,7 @@ def test_print_time_scales_inversely_with_speed() -> None:
     assert t1 == pytest.approx(t2 * 2.0)
 
 
-# ── estimate_material ─────────────────────────────────────────────────────────
+# -- estimate_material ---------------------------------------------------------
 
 def test_material_estimate_returns_positive_values() -> None:
     result = estimate_material(
@@ -118,7 +118,7 @@ def test_material_estimate_returns_positive_values() -> None:
 
 
 def test_material_estimate_volume_formula() -> None:
-    # Elliptical bead cross-section: volume = (π/4) × length × layer_height × nozzle_diameter
+    # Elliptical bead cross-section: volume = (pi/4) x length x layer_height x nozzle_diameter
     result = estimate_material(
         total_path_length_mm=100.0,
         layer_height_mm=0.2,
@@ -144,7 +144,7 @@ def test_material_density_dict_has_expected_keys() -> None:
         assert density > 0.0
 
 
-# ── summarize_metrics ─────────────────────────────────────────────────────────
+# -- summarize_metrics ---------------------------------------------------------
 
 def test_summarize_metrics_required_keys() -> None:
     shape, _, perims, infill, segs = _rect_segments()

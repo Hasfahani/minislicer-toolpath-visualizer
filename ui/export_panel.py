@@ -52,9 +52,24 @@ def render_export_panel(
         production_allowed = False
 
     st.markdown("### Download Files")
+    launch_score = params.get("launch_score", "N/A") if isinstance(params, dict) else "N/A"
+    commercial_fit = params.get("commercial_fit", {}) if isinstance(params, dict) else {}
+    commercial_status = (
+        commercial_fit.get("status", "Review") if isinstance(commercial_fit, dict) else "Review"
+    )
     st.markdown(
-        "CSV, SVG, JSON, and report exports are always available for review. "
-        "Production G-code is gated by readiness checks and an FDM machine profile."
+        f"""
+        <div class="export-package">
+            <div>
+                <div class="export-kicker">Release package</div>
+                <div class="export-title">Traceable planning exports</div>
+                <div class="export-note">CSV - JSON - SVG - dossier - guarded FDM G-code</div>
+            </div>
+            <div class="export-stat"><span>Launch</span><strong>{launch_score}</strong></div>
+            <div class="export-stat"><span>Commercial</span><strong>{commercial_status}</strong></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     d1, d2, d3, d4, d5, d6 = st.columns(6)
@@ -82,6 +97,11 @@ def render_export_panel(
     machine_name = d6.selectbox("Machine", sorted(FDM_MACHINE_PROFILES), label_visibility="collapsed")
 
     try:
+        metadata = params.get("job_metadata", {}) if isinstance(params, dict) else {}
+        export_job_name = (
+            metadata.get("job_name", params.get("shape_type", "MiniSlicer job"))
+            if isinstance(metadata, dict) else params.get("shape_type", "MiniSlicer job")
+        )
         production_gcode = export_production_gcode(
             segments=production_segments,
             machine=FDM_MACHINE_PROFILES[machine_name],
@@ -90,7 +110,7 @@ def render_export_panel(
             travel_speed_mm_s=float(travel_speed),
             extrusion_per_mm=float(extrusion_per_mm),
             z_hop_mm=float(z_hop),
-            job_name=str(params.get("shape_type", "MiniSlicer job")),
+            job_name=str(export_job_name),
         )
         production_error = ""
     except ProductionExportError as exc:

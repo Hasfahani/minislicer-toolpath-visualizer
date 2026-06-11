@@ -86,7 +86,7 @@ def parse_svg_to_polygon(
     return poly, ""
 
 
-# ── Internal helpers ──────────────────────────────────────────────────────────
+# -- Internal helpers ----------------------------------------------------------
 
 def _get_svg_height(root: ET.Element) -> float | None:
     """Return the SVG document height in user units, or None."""
@@ -103,7 +103,7 @@ def _get_svg_height(root: ET.Element) -> float | None:
 
 
 def _parse_points_attr(points_str: str) -> list[tuple[float, float]] | None:
-    """Parse SVG 'points' attribute: 'x1,y1 x2,y2 …' or 'x1 y1 x2 y2 …'."""
+    """Parse SVG 'points' attribute: 'x1,y1 x2,y2 ...' or 'x1 y1 x2 y2 ...'."""
     nums = re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", points_str)
     if len(nums) < 6 or len(nums) % 2 != 0:
         return None

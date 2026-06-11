@@ -148,11 +148,11 @@ def assess_job_readiness(
             "Confirm printer Z capacity, enclosure stability, and collision clearance.",
         ))
 
-    if process_mode.startswith("DED") and not imported_stl:
+    if (process_mode.startswith("DED") or process_mode.startswith("Metal")) and not imported_stl:
         issues.append(ReadinessIssue(
             "info",
             "2D metal preview",
-            "DED / metal mode is being previewed from a 2D outline.",
+            "Metal / LPBF mode is being previewed from a 2D outline.",
             "Import an STL to review cross-sections across the actual Z range.",
         ))
 

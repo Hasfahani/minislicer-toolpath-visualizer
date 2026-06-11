@@ -1,4 +1,4 @@
-"""Tests for src/plotting.py — figure construction and trace validation."""
+"""Tests for src/plotting.py - figure construction and trace validation."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from src.toolpaths import (
 )
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers -------------------------------------------------------------------
 
 def _rect_paths():
     shape = create_rectangle(30.0, 20.0)
@@ -41,7 +41,7 @@ def _trace_names(fig: go.Figure) -> set[str]:
     return {t.name for t in fig.data if t.name}
 
 
-# ── create_toolpath_figure ────────────────────────────────────────────────────
+# -- create_toolpath_figure ----------------------------------------------------
 
 def test_toolpath_figure_returns_figure() -> None:
     shape, boundary, perims, infill = _rect_paths()
@@ -111,7 +111,7 @@ def test_toolpath_figure_empty_perimeters_and_infill() -> None:
     assert isinstance(fig, go.Figure)
 
 
-# ── create_speed_map_figure ───────────────────────────────────────────────────
+# -- create_speed_map_figure ---------------------------------------------------
 
 def test_speed_map_returns_figure() -> None:
     shape, boundary, perims, infill = _rect_paths()
@@ -125,7 +125,7 @@ def test_speed_map_has_scatter_traces() -> None:
     assert _has_trace_type(fig, go.Scatter)
 
 
-# ── create_time_map_figure ────────────────────────────────────────────────────
+# -- create_time_map_figure ----------------------------------------------------
 
 def test_time_map_returns_figure() -> None:
     shape, boundary, perims, infill = _rect_paths()
@@ -139,7 +139,7 @@ def test_time_map_with_no_infill() -> None:
     assert isinstance(fig, go.Figure)
 
 
-# ── create_path_density_figure ────────────────────────────────────────────────
+# -- create_path_density_figure ------------------------------------------------
 
 def test_path_density_returns_figure() -> None:
     shape, boundary, perims, infill = _rect_paths()
@@ -159,7 +159,7 @@ def test_path_density_empty_paths() -> None:
     assert isinstance(fig, go.Figure)
 
 
-# ── create_infill_length_histogram ────────────────────────────────────────────
+# -- create_infill_length_histogram --------------------------------------------
 
 def test_infill_histogram_returns_figure() -> None:
     shape, _, _, infill = _rect_paths()
@@ -178,7 +178,7 @@ def test_infill_histogram_has_histogram_trace() -> None:
     assert _has_trace_type(fig, go.Histogram)
 
 
-# ── create_metrics_figure ─────────────────────────────────────────────────────
+# -- create_metrics_figure -----------------------------------------------------
 
 def test_metrics_figure_returns_figure() -> None:
     metrics = {
@@ -201,7 +201,7 @@ def test_metrics_figure_has_pie_and_bar() -> None:
     assert _has_trace_type(fig, go.Bar)
 
 
-# ── create_3d_figure ──────────────────────────────────────────────────────────
+# -- create_3d_figure ----------------------------------------------------------
 
 def test_3d_figure_returns_figure() -> None:
     shape = create_rectangle(30.0, 20.0)
@@ -219,7 +219,7 @@ def test_3d_figure_has_scatter3d_traces() -> None:
     assert _has_trace_type(fig, go.Scatter3d)
 
 
-# ── create_multilayer_animated_figure ─────────────────────────────────────────
+# -- create_multilayer_animated_figure -----------------------------------------
 
 def test_multilayer_animated_figure_returns_figure() -> None:
     shape = create_rectangle(30.0, 20.0)
@@ -258,7 +258,7 @@ def test_multilayer_animated_figure_empty_layers() -> None:
     assert isinstance(fig, go.Figure)
 
 
-# ── shape_boundary ────────────────────────────────────────────────────────────
+# -- shape_boundary ------------------------------------------------------------
 
 def test_shape_boundary_returns_linestring() -> None:
     shape = create_rectangle(10.0, 5.0)

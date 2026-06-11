@@ -1,4 +1,4 @@
-"""Root conftest — ensures the project root is on sys.path for all tests."""
+"""Root conftest - ensures the project root is on sys.path for all tests."""
 import sys
 from pathlib import Path
 

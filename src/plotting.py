@@ -151,7 +151,7 @@ def create_toolpath_figure(
             hovertemplate="<b>End</b><br>X: %{x:.2f} mm<br>Y: %{y:.2f} mm<extra></extra>",
         ))
 
-    # Direction arrows — small arrow markers at each line's midpoint
+    # Direction arrows - small arrow markers at each line's midpoint
     if show_direction_arrows:
         _add_direction_arrows(fig, perimeter_paths if show_perimeters else [],
                               color=colors["perimeter"], name="Perimeter direction")
@@ -203,7 +203,7 @@ def create_multilayer_animated_figure(
         return fig
 
     # Pre-accumulate (x, y, z) coordinate lists for perimeters and infill
-    # at each frame (layer 0, layers 0-1, layers 0-2, …).
+    # at each frame (layer 0, layers 0-1, layers 0-2, ...).
     # Using None-separated single traces keeps frame payloads small.
     acc_px: list[float | None] = []
     acc_py: list[float | None] = []
@@ -279,7 +279,7 @@ def create_multilayer_animated_figure(
     ]
 
     fig.update_layout(
-        title=f"Multi-Layer Build — {len(layers)} layer{'s' if len(layers) != 1 else ''}",
+        title=f"Multi-Layer Build - {len(layers)} layer{'s' if len(layers) != 1 else ''}",
         scene=dict(
             xaxis_title="X (mm)",
             yaxis_title="Y (mm)",
@@ -294,14 +294,14 @@ def create_multilayer_animated_figure(
             y=-0.12, x=0.5, xanchor="center", yanchor="top",
             buttons=[
                 dict(
-                    label="▶  Play",
+                    label="Play",
                     method="animate",
                     args=[None, dict(frame=dict(duration=300, redraw=True),
                                     fromcurrent=True,
                                     transition=dict(duration=0))],
                 ),
                 dict(
-                    label="⏸  Pause",
+                    label="Pause",
                     method="animate",
                     args=[[None], dict(frame=dict(duration=0, redraw=False),
                                       mode="immediate",
@@ -366,7 +366,7 @@ def create_3d_figure(
             ))
 
     fig.update_layout(
-        title=f"3D Layer Stack — {layer_count} layer{'s' if layer_count != 1 else ''}",
+        title=f"3D Layer Stack - {layer_count} layer{'s' if layer_count != 1 else ''}",
         scene=dict(
             xaxis_title="X (mm)",
             yaxis_title="Y (mm)",
@@ -439,7 +439,7 @@ def create_speed_map_figure(
         ))
 
     fig.update_layout(
-        title=f"Speed Map — Perimeter: {perim_speed:.0f} mm/s ({perimeter_speed_multiplier:.0%}) | Infill: {print_speed_mm_s:.0f} | Travel: {travel_speed_mm_s:.0f} mm/s",
+        title=f"Speed Map - Perimeter: {perim_speed:.0f} mm/s ({perimeter_speed_multiplier:.0%}) | Infill: {print_speed_mm_s:.0f} | Travel: {travel_speed_mm_s:.0f} mm/s",
         xaxis_title="X (mm)", yaxis_title="Y (mm)", template="plotly_white",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.0),
         margin=dict(l=24, r=24, t=70, b=24), hovermode="closest",
@@ -487,7 +487,7 @@ def create_time_map_figure(
         max_l = max(lengths)
         span = max(max_l - min_l, 1e-9)
 
-        # Bucket into 5 bands: blue → cyan → green → orange → red
+        # Bucket into 5 bands: blue -> cyan -> green -> orange -> red
         bucket_colors = ["#3b82f6", "#06b6d4", "#22c55e", "#f97316", "#ef4444"]
         bucket_labels = ["shortest (fast)", "short", "medium", "long", "longest (slow)"]
         n = len(bucket_colors)
@@ -514,7 +514,7 @@ def create_time_map_figure(
             ))
 
     fig.update_layout(
-        title="Time Map — infill color indicates path duration (blue=fast, red=slow)",
+        title="Time Map - infill color indicates path duration (blue=fast, red=slow)",
         xaxis_title="X (mm)", yaxis_title="Y (mm)", template="plotly_white",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.0),
         margin=dict(l=24, r=24, t=70, b=24), hovermode="closest",
@@ -650,7 +650,7 @@ def create_infill_length_histogram(
     subtitle = ""
     if print_speed_mm_s > 0:
         avg_t = (sum(lengths) / len(lengths)) / print_speed_mm_s * 1000
-        subtitle = f" — avg {avg_t:.0f} ms per line at {print_speed_mm_s:.0f} mm/s"
+        subtitle = f" - avg {avg_t:.0f} ms per line at {print_speed_mm_s:.0f} mm/s"
 
     fig.update_layout(
         title=f"Infill Line Length Distribution{subtitle}",
@@ -668,7 +668,7 @@ def shape_boundary(shape: Polygon) -> LineString:
     return LineString(shape.exterior.coords)
 
 
-# ── Internal helpers ──────────────────────────────────────────────────────────
+# -- Internal helpers ----------------------------------------------------------
 
 def _add_line(
     fig: go.Figure,
@@ -873,7 +873,7 @@ def _add_dimension_annotations(fig: go.Figure, lines: list[LineString]) -> None:
     # Width annotation below the shape
     fig.add_annotation(
         x=(min_x + max_x) / 2, y=min_y - pad,
-        text=f"← {w:.1f} mm →",
+        text=f"<- {w:.1f} mm ->",
         showarrow=False,
         font=dict(size=10, color="#64748b"),
         xref="x", yref="y",
@@ -881,7 +881,7 @@ def _add_dimension_annotations(fig: go.Figure, lines: list[LineString]) -> None:
     # Height annotation to the right
     fig.add_annotation(
         x=max_x + pad, y=(min_y + max_y) / 2,
-        text=f"↕ {h:.1f} mm",
+        text=f"<-> {h:.1f} mm",
         showarrow=False,
         font=dict(size=10, color="#64748b"),
         xref="x", yref="y",
@@ -936,7 +936,7 @@ def create_path_density_figure(
                       fillcolor="rgba(0,0,0,0)", layer="above")
 
     fig.update_layout(
-        title="Path Density Map — hotter = more material / more passes",
+        title="Path Density Map - hotter = more material / more passes",
         xaxis_title="X (mm)", yaxis_title="Y (mm)",
         template="plotly_dark",
         margin=dict(l=24, r=24, t=70, b=24),

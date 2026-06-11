@@ -11,7 +11,7 @@ class PrinterProfile:
 
     Attributes:
         name: Human-readable profile name.
-        process: Technology label — ``"FDM"`` or ``"LPBF"``.
+        process: Technology label - ``"FDM"`` or ``"LPBF"``.
         scan_speed_mm_s: Print/scan speed in mm/s.
         layer_thickness_mm: Layer height in mm.
         hatch_spacing_mm: Extrusion/nozzle width (FDM) or laser hatch spacing (LPBF) in mm.
@@ -43,20 +43,20 @@ class MachineGcodeProfile:
     end_gcode: tuple[str, ...]
 
 
-# ── Built-in profiles ─────────────────────────────────────────────────────────
+# -- Built-in profiles ---------------------------------------------------------
 
 PRINTER_PROFILES: dict[str, PrinterProfile] = {
-    "— Custom —": PrinterProfile(
-        name="— Custom —",
+    "- Custom -": PrinterProfile(
+        name="- Custom -",
         process="FDM",
         scan_speed_mm_s=50.0,
         layer_thickness_mm=0.20,
         hatch_spacing_mm=0.40,
         material="PLA",
-        description="Manually configured — no preset applied.",
+        description="Manually configured - no preset applied.",
     ),
-    "PLA – FDM 0.4 mm": PrinterProfile(
-        name="PLA – FDM 0.4 mm",
+    "PLA - FDM 0.4 mm": PrinterProfile(
+        name="PLA - FDM 0.4 mm",
         process="FDM",
         scan_speed_mm_s=50.0,
         layer_thickness_mm=0.20,
@@ -64,17 +64,17 @@ PRINTER_PROFILES: dict[str, PrinterProfile] = {
         material="PLA",
         description="Generic FDM PLA on a 0.4 mm nozzle, balanced quality/speed.",
     ),
-    "PETG – FDM 0.4 mm": PrinterProfile(
-        name="PETG – FDM 0.4 mm",
+    "PETG - FDM 0.4 mm": PrinterProfile(
+        name="PETG - FDM 0.4 mm",
         process="FDM",
         scan_speed_mm_s=40.0,
         layer_thickness_mm=0.20,
         hatch_spacing_mm=0.40,
         material="PETG",
-        description="PETG on a 0.4 mm nozzle — slower than PLA for layer adhesion.",
+        description="PETG on a 0.4 mm nozzle - slower than PLA for layer adhesion.",
     ),
-    "ABS – FDM 0.4 mm": PrinterProfile(
-        name="ABS – FDM 0.4 mm",
+    "ABS - FDM 0.4 mm": PrinterProfile(
+        name="ABS - FDM 0.4 mm",
         process="FDM",
         scan_speed_mm_s=45.0,
         layer_thickness_mm=0.20,
@@ -82,32 +82,32 @@ PRINTER_PROFILES: dict[str, PrinterProfile] = {
         material="ABS",
         description="ABS on a 0.4 mm nozzle; enclosure strongly recommended.",
     ),
-    "316L – LPBF": PrinterProfile(
-        name="316L – LPBF",
+    "316L - LPBF": PrinterProfile(
+        name="316L - LPBF",
         process="LPBF",
         scan_speed_mm_s=700.0,
         layer_thickness_mm=0.03,
         hatch_spacing_mm=0.10,
         material="Steel 316L",
-        description="316L stainless steel LPBF — 70 W laser, 80 µm spot (typical parameters).",
+        description="316L stainless steel LPBF - 70 W laser, 80 um spot (typical parameters).",
     ),
-    "Ti-6Al-4V – LPBF": PrinterProfile(
-        name="Ti-6Al-4V – LPBF",
+    "Ti-6Al-4V - LPBF": PrinterProfile(
+        name="Ti-6Al-4V - LPBF",
         process="LPBF",
         scan_speed_mm_s=600.0,
         layer_thickness_mm=0.03,
         hatch_spacing_mm=0.10,
         material="Titanium Ti-6Al-4V",
-        description="Titanium alloy LPBF — slower scan speed improves fusion depth.",
+        description="Titanium alloy LPBF - slower scan speed improves fusion depth.",
     ),
-    "Inconel 625 – LPBF": PrinterProfile(
-        name="Inconel 625 – LPBF",
+    "Inconel 625 - LPBF": PrinterProfile(
+        name="Inconel 625 - LPBF",
         process="LPBF",
         scan_speed_mm_s=800.0,
         layer_thickness_mm=0.04,
         hatch_spacing_mm=0.11,
         material="Inconel 625",
-        description="Inconel 625 LPBF — high scan speed, good for complex geometries.",
+        description="Inconel 625 LPBF - high scan speed, good for complex geometries.",
     ),
 }
 
@@ -193,5 +193,5 @@ FDM_MACHINE_PROFILES: dict[str, MachineGcodeProfile] = {
 
 def profile_names() -> list[str]:
     """Return the sorted list of available profile names (Custom first)."""
-    names = sorted(k for k in PRINTER_PROFILES if k != "— Custom —")
-    return ["— Custom —"] + names
+    names = sorted(k for k in PRINTER_PROFILES if k != "- Custom -")
+    return ["- Custom -"] + names

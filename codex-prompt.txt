@@ -1,0 +1,64 @@
+You are improving a Python Streamlit toolpath visualizer for additive manufacturing
+called MiniSlicer. The project is at a working, well-structured state. Your job is
+to make targeted improvements - do not rewrite what works.
+
+## Project layout (key files)
+- app.py               - Streamlit UI entry point (~600+ lines, needs splitting)
+- src/geometry.py      - Shape creation, polygon validation
+- src/toolpaths.py     - Perimeter/infill generation, Segment dataclass
+- src/metrics.py       - Path length, print-time, material estimates
+- src/profiles.py      - Printer material presets (FDM + LPBF)
+- src/plotting.py      - Plotly 2D/3D figure builders
+- src/animation.py     - Nozzle-path playback animation
+- src/stl_import.py    - STL mesh loading and cross-section slicing
+- src/exporters.py     - CSV, SVG, JSON, G-code-like export
+- src/svg_import.py    - SVG outline to Shapely polygon
+
+## Known issues to fix
+
+### 1. Split app.py into page modules
+app.py is a monolith mixing sidebar controls, shape parameter widgets, infill
+controls, transform controls, STL workflow, export buttons, and visualization
+dispatch. Split it into focused modules under a ui/ folder:
+- ui/sidebar.py         - shape selector, profile presets, config import
+- ui/shape_controls.py  - per-shape parameter widgets
+- ui/process_controls.py - infill, perimeters, speed, layer height
+- ui/stl_workflow.py    - STL upload, slice controls, multi-layer UI
+- ui/export_panel.py    - all download buttons and G-code preview
+Keep app.py as a thin orchestrator that imports and calls these.
+
+### 2. Remove the duplicate PROFILES dict
+app.py defines its own PROFILES dict (Fast Preview, Draft, Balanced, Strong, Fine)
+that duplicates logic already in src/profiles.py. Consolidate - either extend
+src/profiles.py to cover these UI-level presets, or import from there. Do not
+maintain two sources of truth.
+
+### 3. Add a real-time segment count warning
+In the metrics sidebar, if total segment count exceeds 5000, show a Streamlit
+st.warning() telling the user to increase spacing or reduce perimeters to avoid
+slow renders. Compute this from the existing summarize_metrics() output.
+
+### 4. Improve STL slice feedback
+In the STL workflow, after slicing, show a small st.info() summary:
+"Sliced N layers from Z=X mm to Z=Y mm (step: S mm)" using data already
+returned by slice_stl_multi_layer(). Currently there is no feedback after the
+slice completes.
+
+### 5. Fix the profiles module to be the single source of truth
+src/profiles.py has PRINTER_PROFILES for material presets (PLA, PETG, 316L, etc.)
+but does not include the UI speed presets (Draft, Balanced, Fine, etc.).
+Add a QUALITY_PROFILES dict to src/profiles.py for these, and import it in app.py
+instead of redefining them inline.
+
+## Constraints
+- Do not change the public API of any src/ module (other than profiles.py additions).
+- Do not replace Streamlit with another framework.
+- Do not add new dependencies beyond what is already in requirements.txt.
+- All existing pytest tests must continue to pass.
+- Keep the same dark/light theme toggle behavior.
+- Do not add docstrings or inline comments unless the logic is genuinely non-obvious.
+- Match the existing code style: type hints, f-strings, no unused imports.
+
+## Output
+Return the full content of each file you modify or create. List changed files at
+the top of your response so it is clear what changed.

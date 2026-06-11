@@ -83,7 +83,7 @@ def test_gcode_like_export_has_disclaimer() -> None:
 
 def test_gcode_like_export_has_feedrate() -> None:
     gcode = export_gcode_like(_sample_segments(), print_speed_mm_s=10.0)
-    # 10 mm/s → 600 mm/min
+    # 10 mm/s -> 600 mm/min
     assert "F600.0" in gcode
 
 

@@ -9,7 +9,7 @@ import math
 from shapely.geometry import MultiPolygon, Point, Polygon
 
 
-# ── Public types ──────────────────────────────────────────────────────────────
+# -- Public types --------------------------------------------------------------
 
 class BoundingBox(NamedTuple):
     """Width and height of a polygon's axis-aligned bounding box (mm)."""
@@ -18,7 +18,7 @@ class BoundingBox(NamedTuple):
     height: float
 
 
-# ── Shape creation ────────────────────────────────────────────────────────────
+# -- Shape creation ------------------------------------------------------------
 
 def create_rectangle(width: float, height: float) -> Polygon:
     """Create an axis-aligned rectangle with lower-left corner at (0, 0).
@@ -205,7 +205,7 @@ def create_arrow_shape(length: float, head_width: float, shaft_width: float) -> 
     return Polygon(coords)
 
 
-# ── Polygon validation ────────────────────────────────────────────────────────
+# -- Polygon validation --------------------------------------------------------
 
 def validate_polygon(shape: Polygon) -> Polygon | None:
     """Return a valid polygon if possible, otherwise ``None``.
@@ -230,7 +230,7 @@ def validate_polygon(shape: Polygon) -> Polygon | None:
     return None
 
 
-# ── Custom polygon parsing ────────────────────────────────────────────────────
+# -- Custom polygon parsing ----------------------------------------------------
 
 def parse_custom_polygon(coords_text: str) -> Polygon | None:
     """Parse a polygon from a string like ``x,y; x,y; x,y``.
@@ -249,7 +249,7 @@ def parse_custom_polygon(coords_text: str) -> Polygon | None:
     return validate_polygon(Polygon(points))
 
 
-# ── Geometry utilities ────────────────────────────────────────────────────────
+# -- Geometry utilities --------------------------------------------------------
 
 def bounding_box(shape: Polygon) -> BoundingBox:
     """Return the axis-aligned bounding box dimensions of ``shape``."""
@@ -258,7 +258,7 @@ def bounding_box(shape: Polygon) -> BoundingBox:
 
 
 def polygon_area(shape: Polygon) -> float:
-    """Return the area of ``shape`` in mm²."""
+    """Return the area of ``shape`` in mm2."""
     return float(shape.area)
 
 
@@ -268,14 +268,14 @@ def polygon_centroid(shape: Polygon) -> tuple[float, float]:
     return (float(c.x), float(c.y))
 
 
-# ── Backward-compatible alias ─────────────────────────────────────────────────
+# -- Backward-compatible alias -------------------------------------------------
 
 def bounding_box_dimensions(shape: Polygon) -> BoundingBox:
     """Alias for :func:`bounding_box` kept for compatibility."""
     return bounding_box(shape)
 
 
-# ── Internal helpers ──────────────────────────────────────────────────────────
+# -- Internal helpers ----------------------------------------------------------
 
 def _parse_points(coords_text: str) -> list[tuple[float, float]]:
     """Parse coordinate pairs from semi-colon separated text.

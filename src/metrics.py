@@ -10,7 +10,7 @@ from shapely.geometry import Polygon
 from src.geometry import bounding_box, polygon_area
 from src.toolpaths import Segment, total_travel_distance
 
-# Material densities in g/cm³ (FDM polymers + DED metals)
+# Material densities in g/cm3 (FDM polymers + DED metals)
 MATERIAL_DENSITY: dict[str, float] = {
     # FDM polymers
     "PLA": 1.24,
@@ -56,7 +56,7 @@ def _move_time_s(length_mm: float, speed_mm_s: float, accel_mm_s2: float) -> flo
     if length_mm >= d_ramp:
         # Cruise phase exists: t = V/A (ramp) + (L - d_ramp)/V (cruise)
         return speed_mm_s / accel_mm_s2 + (length_mm - d_ramp) / speed_mm_s
-    # Triangular profile — peak speed never reached
+    # Triangular profile - peak speed never reached
     return 2.0 * math.sqrt(length_mm / accel_mm_s2)
 
 
@@ -75,21 +75,21 @@ def estimate_material(
     """
     density = MATERIAL_DENSITY.get(material, 1.24)
 
-    # Volume of material deposited (mm³) using elliptical bead cross-section:
-    #   A_bead ≈ (π/4) × nozzle_diameter × layer_height
+    # Volume of material deposited (mm3) using elliptical bead cross-section:
+    #   A_bead approx (pi/4) x nozzle_diameter x layer_height
     # This is more accurate than a rectangular cross-section because the
-    # extruded bead rounds at the edges; π/4 ≈ 0.785 reduces the estimate
+    # extruded bead rounds at the edges; pi/4 approx 0.785 reduces the estimate
     # by ~21% compared to the flat rectangular model.
     material_volume_mm3 = (math.pi / 4.0) * total_path_length_mm * layer_height_mm * nozzle_diameter_mm
 
-    # Filament volume → filament length
+    # Filament volume -> filament length
     filament_radius_mm = filament_diameter_mm / 2.0
     filament_volume_mm3 = math.pi * filament_radius_mm ** 2
     filament_length_mm = (
         material_volume_mm3 / filament_volume_mm3 if filament_volume_mm3 > 0 else 0.0
     )
 
-    # Weight: convert mm³ → cm³ (* 0.001), then multiply by density (g/cm³)
+    # Weight: convert mm3 -> cm3 (* 0.001), then multiply by density (g/cm3)
     weight_g = material_volume_mm3 * 0.001 * density
 
     return {
