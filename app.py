@@ -2,32 +2,24 @@
 
 from __future__ import annotations
 
-import math
+from dataclasses import replace
 from html import escape
-from typing import Any
+from math import ceil
 
 import streamlit as st
-from shapely import affinity
-from shapely.geometry import Polygon
 
 from src.animation import create_animated_figure
+from src.catalog import PATTERN_ICONS, PATTERNS, SHAPE_ICONS, SHAPES
 from src.exporters import segments_to_dataframe
-from src.geometry import (
-    create_arrow_shape,
-    create_capsule,
-    create_circle,
-    create_cross,
-    create_ellipse,
-    create_regular_polygon,
-    create_rectangle,
-    create_rounded_rectangle,
-    create_star,
-    create_triangle,
-    parse_custom_polygon,
-    validate_polygon,
-)
+from src.geometry import validate_polygon
 from src.job_analysis import (
+    assess_commercial_fit,
+    build_batch_scenarios,
+    build_launch_recommendations,
+    build_quality_scorecard,
+    build_release_checklist,
     classify_program_risk,
+    compute_launch_score,
     estimate_job_economics,
     generate_job_dossier_html,
     generate_job_dossier_markdown,
@@ -41,127 +33,89 @@ from src.plotting import (
     create_speed_map_figure,
     create_time_map_figure,
     create_toolpath_figure,
-    shape_boundary,
+)
+from src.planner import (
+    ToolpathSettings,
+    alternating_layer_angle,
+    build_plan_fingerprint,
+    build_production_segments,
+    plan_layer,
+    rank_infill_patterns,
 )
 from src.svg_import import parse_svg_to_polygon
 from src.stl_import import slice_stl_to_polygon
 from src.toolpaths import (
-    build_ordered_segments,
-    filter_short_lines,
     generate_infill,
     generate_inward_perimeters,
-    optimize_path_order,
-    simplify_lines,
     total_travel_distance,
 )
 from src.validation import assess_job_readiness, readiness_to_dict
+from src.workflow import apply_placement, build_shape, fmt_time, largest_polygon
+from ui.dashboard import (
+    render_executive_dashboard,
+    render_launch_ribbon,
+    render_launch_optimizer,
+    render_next_action,
+    render_pattern_ranking,
+    render_quality_scorecard,
+    render_release_gate_matrix,
+)
 from ui.export_panel import render_export_panel
 from ui.sidebar import render_quick_setup, render_sidebar
 from ui.stl_workflow import render_stl_multilayer_view
 
 
-SHAPES = [
-    "Rectangle", "Rounded Rectangle", "Circle", "Ellipse", "Triangle",
-    "Regular Polygon", "Star", "Cross", "Capsule", "Arrow", "Custom Polygon",
-]
-PATTERNS = ["Parallel Lines", "Zigzag", "Grid", "Triangles", "Honeycomb", "Concentric"]
+# ---------------------------------------------------------------------------
+# Performance: cached wrappers for expensive geometry/toolpath computations.
+# Shapes are passed as WKT strings so Streamlit can hash them correctly.
+# ---------------------------------------------------------------------------
 
-SHAPE_ICONS = {
-    "Rectangle": "[]", "Rounded Rectangle": "()", "Circle": "o", "Ellipse": "0",
-    "Triangle": "^", "Regular Polygon": "hex", "Star": "*", "Cross": "+",
-    "Capsule": "cap", "Arrow": "->", "Custom Polygon": "pen",
-}
-
-PATTERN_ICONS = {
-    "Parallel Lines": "|||", "Zigzag": "zig", "Grid": "#",
-    "Triangles": "tri", "Honeycomb": "hex", "Concentric": "O",
-}
-
-
-def fmt_time(seconds: float) -> str:
-    if math.isinf(seconds):
-        return "inf"
-    if seconds >= 3600:
-        return f"{int(seconds // 3600)}h {int((seconds % 3600) // 60)}m"
-    if seconds >= 60:
-        return f"{int(seconds // 60)}m {seconds % 60:.0f}s"
-    return f"{seconds:.1f}s"
+@st.cache_data(show_spinner=False)
+def _cached_plan_layer(
+    shape_wkt: str,
+    infill_wkt: str,
+    settings: ToolpathSettings,
+    layer: int,
+    infill_angle_deg: float | None = None,
+):
+    from shapely import wkt
+    return plan_layer(
+        wkt.loads(shape_wkt),
+        wkt.loads(infill_wkt),
+        settings,
+        layer=layer,
+        infill_angle_deg=infill_angle_deg,
+    )
 
 
-def largest_polygon(geometry: object) -> Polygon | None:
-    if isinstance(geometry, Polygon) and not geometry.is_empty:
-        return geometry
-    geoms = getattr(geometry, "geoms", None)
-    if geoms is None:
-        return None
-    polys = [geom for geom in geoms if isinstance(geom, Polygon) and not geom.is_empty]
-    return max(polys, key=lambda poly: poly.area) if polys else None
+@st.cache_data(show_spinner="Computing production layers...")
+def _cached_production_segments(
+    shape_wkt: str,
+    infill_wkt: str,
+    settings: ToolpathSettings,
+    layer_count: int,
+    alternate_angle: bool,
+    layer_limit: int,
+):
+    from shapely import wkt
+    return build_production_segments(
+        wkt.loads(shape_wkt),
+        wkt.loads(infill_wkt),
+        settings,
+        layer_count=layer_count,
+        alternate_angle=alternate_angle,
+        layer_limit=layer_limit,
+    )
 
 
-def build_shape(shape_type: str, settings: dict[str, Any]) -> Polygon | None:
-    if shape_type == "Rectangle":
-        return create_rectangle(settings["width"], settings["height"])
-    if shape_type == "Rounded Rectangle":
-        return create_rounded_rectangle(settings["width"], settings["height"], settings["corner_radius"])
-    if shape_type == "Circle":
-        return create_circle(settings["radius"])
-    if shape_type == "Ellipse":
-        return create_ellipse(settings["width"], settings["height"])
-    if shape_type == "Triangle":
-        return create_triangle(settings["width"], settings["height"])
-    if shape_type == "Regular Polygon":
-        return create_regular_polygon(settings["radius"], settings["sides"])
-    if shape_type == "Star":
-        return create_star(settings["radius"], settings["inner_radius"], settings["points"])
-    if shape_type == "Cross":
-        return create_cross(settings["size"], settings["arm_width"])
-    if shape_type == "Capsule":
-        return create_capsule(settings["width"], settings["height"])
-    if shape_type == "Arrow":
-        return create_arrow_shape(settings["length"], settings["head_width"], settings["shaft_width"])
-    return parse_custom_polygon(settings["coords_text"])
-
-
-def apply_placement(shape: Polygon, settings: dict[str, Any]) -> Polygon:
-    if settings["scale_pct"] != 100:
-        centroid = shape.centroid
-        scale = settings["scale_pct"] / 100.0
-        shape = affinity.scale(shape, xfact=scale, yfact=scale, origin=(centroid.x, centroid.y))
-
-    if settings["mirror_x"] or settings["mirror_y"]:
-        centroid = shape.centroid
-        shape = affinity.scale(
-            shape,
-            xfact=-1.0 if settings["mirror_x"] else 1.0,
-            yfact=-1.0 if settings["mirror_y"] else 1.0,
-            origin=(centroid.x, centroid.y),
-        )
-
-    if settings["rotate_deg"]:
-        centroid = shape.centroid
-        shape = affinity.rotate(shape, settings["rotate_deg"], origin=(centroid.x, centroid.y))
-
-    if settings["translate_x"] or settings["translate_y"]:
-        shape = affinity.translate(shape, xoff=settings["translate_x"], yoff=settings["translate_y"])
-
-    if settings["fit_to_plate"] and settings["show_plate"]:
-        min_x, min_y, max_x, max_y = shape.bounds
-        target_w = max(settings["plate_w"] - 2 * settings["plate_margin"], 1.0)
-        target_h = max(settings["plate_d"] - 2 * settings["plate_margin"], 1.0)
-        scale = min(1.0, target_w / max(max_x - min_x, 1e-9), target_h / max(max_y - min_y, 1e-9))
-        if scale < 1.0:
-            centroid = shape.centroid
-            shape = affinity.scale(shape, xfact=scale, yfact=scale, origin=(centroid.x, centroid.y))
-
-    if settings["center_on_plate"] and settings["show_plate"]:
-        centroid = shape.centroid
-        shape = affinity.translate(
-            shape,
-            xoff=settings["plate_w"] / 2 - centroid.x,
-            yoff=settings["plate_d"] / 2 - centroid.y,
-        )
-
-    return shape
+@st.cache_data(show_spinner="Ranking infill patterns...")
+def _cached_rank_infill_patterns(
+    infill_wkt: str,
+    patterns: tuple[str, ...],
+    settings: ToolpathSettings,
+):
+    from shapely import wkt
+    return rank_infill_patterns(wkt.loads(infill_wkt), list(patterns), settings)
 
 
 def app_css() -> None:
@@ -174,18 +128,21 @@ def app_css() -> None:
             --ms-line: #d7dde8;
             --ms-panel: #ffffff;
             --ms-surface: #f5f7fb;
+            --ms-soft: #eef2f7;
             --ms-blue: #1d4ed8;
             --ms-teal: #0f766e;
             --ms-amber: #b45309;
             --ms-green: #15803d;
+            --ms-red: #b91c1c;
+            --ms-shadow: 0 16px 38px rgba(23, 32, 51, 0.08);
         }
-        .stApp { background: linear-gradient(180deg, #f7f9fc 0%, #ffffff 34rem); }
+        .stApp { background: linear-gradient(180deg, #eef3f8 0%, #f8fafc 24rem, #ffffff 52rem); }
         .block-container { padding-top: 0.65rem; padding-bottom: 2rem; max-width: 1600px; }
         .ms-header {
-            background: #172033; border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 8px; padding: 0.95rem 1.2rem 0.9rem; margin-bottom: 0.85rem;
+            background: #172033; border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 8px; padding: 1rem 1.15rem 0.95rem; margin-bottom: 0.75rem;
             display: flex; align-items: center; gap: 0.85rem;
-            box-shadow: 0 12px 30px rgba(23, 32, 51, 0.12);
+            box-shadow: 0 18px 42px rgba(23, 32, 51, 0.16);
         }
         .ms-header-icon {
             width: 2.25rem; height: 2.25rem; border-radius: 8px; display: grid;
@@ -198,23 +155,171 @@ def app_css() -> None:
             border: 1px solid rgba(94,234,212,0.28); border-radius: 6px;
             padding: 0.25rem 0.75rem; font-size: 0.75rem; color: #ccfbf1; white-space: nowrap;
         }
+        .launch-ribbon {
+            display: grid; grid-template-columns: minmax(14rem, 1fr) auto minmax(9rem, auto);
+            gap: 1rem; align-items: center; background: rgba(255,255,255,0.92);
+            border: 1px solid var(--ms-line); border-radius: 8px; padding: 0.85rem 1rem;
+            margin: 0.1rem 0 0.9rem; box-shadow: var(--ms-shadow);
+        }
+        .launch-kicker { color: var(--ms-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 760; }
+        .launch-title { color: var(--ms-ink); font-size: 1.05rem; font-weight: 780; line-height: 1.2; }
+        .launch-sub { color: var(--ms-muted); font-size: 0.8rem; margin-top: 0.1rem; }
+        .launch-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem; }
+        .launch-money { text-align: right; color: var(--ms-muted); font-size: 0.76rem; }
+        .launch-money strong { display: block; color: var(--ms-ink); font-size: 1.32rem; line-height: 1.1; }
+        .ms-pill {
+            display: inline-flex; align-items: center; min-height: 1.75rem; border-radius: 6px;
+            padding: 0.18rem 0.66rem; font-size: 0.76rem; font-weight: 720;
+            border: 1px solid var(--ms-line); background: #ffffff; color: var(--ms-ink);
+        }
+        .ms-pill-ok { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+        .ms-pill-warn { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+        .ms-pill-bad { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+        .exec-hero {
+            display: grid; grid-template-columns: minmax(0, 1fr) minmax(8rem, auto); gap: 1rem;
+            align-items: center; background: #172033; border-radius: 8px;
+            padding: 1.15rem 1.25rem; margin-bottom: 0.9rem; box-shadow: var(--ms-shadow);
+        }
+        .exec-eyebrow { color: #8dd6cc; text-transform: uppercase; font-size: 0.72rem; font-weight: 760; }
+        .exec-hero h2 { color: #ffffff; font-size: 1.55rem; margin: 0.1rem 0; line-height: 1.2; }
+        .exec-hero p { color: #cbd5e1; margin: 0; font-size: 0.86rem; }
+        .exec-score {
+            display: grid; grid-template-columns: auto auto; column-gap: 0.2rem; align-items: end;
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.13);
+            border-radius: 8px; padding: 0.75rem 0.95rem; min-width: 8.5rem; text-align: right;
+        }
+        .exec-score span { grid-column: 1 / -1; color: #cbd5e1; font-size: 0.75rem; font-weight: 720; }
+        .exec-score strong { color: #ffffff; font-size: 2.3rem; line-height: 0.95; }
+        .exec-score small { color: #cbd5e1; font-size: 0.85rem; margin-bottom: 0.2rem; }
         .exec-strip {
             display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem;
             margin: 0.2rem 0 0.9rem;
         }
         .exec-card {
             background: #ffffff; border: 1px solid var(--ms-line); border-radius: 8px;
-            padding: 0.85rem 0.95rem; min-height: 5.4rem;
+            padding: 0.9rem 0.95rem; min-height: 5.6rem; box-shadow: 0 10px 24px rgba(23, 32, 51, 0.055);
         }
         .exec-label { color: var(--ms-muted); font-size: 0.76rem; font-weight: 650; margin-bottom: 0.25rem; }
         .exec-value { color: var(--ms-ink); font-size: 1.35rem; font-weight: 760; line-height: 1.2; }
         .exec-note { color: var(--ms-muted); font-size: 0.78rem; margin-top: 0.25rem; }
-        @media (max-width: 980px) { .exec-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        @media (max-width: 640px) { .exec-strip { grid-template-columns: 1fr; } }
+        .exec-text-ok { color: var(--ms-green); }
+        .exec-text-warn { color: var(--ms-amber); }
+        .exec-text-bad { color: var(--ms-red); }
+        .exec-text-neutral { color: var(--ms-ink); }
+        .gate-grid {
+            display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.65rem;
+            margin: 0.2rem 0 1rem;
+        }
+        .gate-card {
+            background: #ffffff; border: 1px solid var(--ms-line); border-radius: 8px;
+            padding: 0.78rem 0.82rem; min-height: 5.3rem; box-shadow: 0 10px 22px rgba(23, 32, 51, 0.05);
+        }
+        .gate-ok { border-top: 3px solid var(--ms-green); }
+        .gate-warn { border-top: 3px solid var(--ms-amber); }
+        .gate-bad { border-top: 3px solid var(--ms-red); }
+        .gate-neutral { border-top: 3px solid var(--ms-blue); }
+        .gate-top { color: var(--ms-muted); font-size: 0.72rem; font-weight: 760; text-transform: uppercase; }
+        .gate-state { color: var(--ms-ink); font-size: 1rem; font-weight: 780; margin-top: 0.25rem; }
+        .gate-signal { color: var(--ms-muted); font-size: 0.76rem; margin-top: 0.2rem; line-height: 1.25; }
+        .quality-hero {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center;
+            background: #ffffff; border: 1px solid var(--ms-line); border-left: 4px solid var(--ms-blue);
+            border-radius: 8px; padding: 1rem 1.05rem; margin: 0.1rem 0 0.8rem; box-shadow: var(--ms-shadow);
+        }
+        .quality-hero.quality-ok { border-left-color: var(--ms-green); }
+        .quality-hero.quality-warn { border-left-color: var(--ms-amber); }
+        .quality-hero.quality-bad { border-left-color: var(--ms-red); }
+        .quality-kicker { color: var(--ms-muted); text-transform: uppercase; font-size: 0.72rem; font-weight: 760; }
+        .quality-hero h3 { color: var(--ms-ink); margin: 0.08rem 0; font-size: 1.35rem; line-height: 1.2; }
+        .quality-hero p { color: var(--ms-muted); margin: 0; font-size: 0.82rem; }
+        .quality-total { color: var(--ms-ink); font-size: 2.3rem; font-weight: 830; line-height: 1; text-align: right; }
+        .quality-total span { color: var(--ms-muted); font-size: 0.85rem; font-weight: 680; }
+        .quality-grid {
+            display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.65rem;
+            margin: 0 0 0.85rem;
+        }
+        .quality-card {
+            background: #ffffff; border: 1px solid var(--ms-line); border-radius: 8px;
+            padding: 0.82rem 0.88rem; min-height: 7.1rem; box-shadow: 0 10px 22px rgba(23, 32, 51, 0.045);
+        }
+        .quality-ok { border-top: 3px solid var(--ms-green); }
+        .quality-warn { border-top: 3px solid var(--ms-amber); }
+        .quality-bad { border-top: 3px solid var(--ms-red); }
+        .quality-top { color: var(--ms-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 760; }
+        .quality-score { color: var(--ms-ink); font-size: 1.55rem; font-weight: 820; line-height: 1.1; margin-top: 0.25rem; }
+        .quality-score span { color: var(--ms-muted); font-size: 0.72rem; font-weight: 680; }
+        .quality-state { color: var(--ms-ink); font-size: 0.82rem; font-weight: 720; margin-top: 0.16rem; }
+        .quality-signal { color: var(--ms-muted); font-size: 0.76rem; line-height: 1.25; margin-top: 0.2rem; }
+        .pattern-winner {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center;
+            background: #ffffff; border: 1px solid var(--ms-line); border-left: 4px solid var(--ms-teal);
+            border-radius: 8px; padding: 0.95rem 1rem; margin: 0 0 0.75rem; box-shadow: var(--ms-shadow);
+        }
+        .pattern-kicker { color: var(--ms-muted); text-transform: uppercase; font-size: 0.72rem; font-weight: 760; }
+        .pattern-name { color: var(--ms-ink); font-size: 1.3rem; font-weight: 790; line-height: 1.15; }
+        .pattern-note { color: var(--ms-muted); font-size: 0.8rem; margin-top: 0.2rem; }
+        .pattern-score { color: var(--ms-teal); font-size: 2rem; font-weight: 820; line-height: 1; text-align: right; }
+        .pattern-score span { color: var(--ms-muted); font-size: 0.78rem; font-weight: 680; }
+        .optimizer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
+        .optimizer-card {
+            background: #ffffff; border: 1px solid var(--ms-line); border-left: 4px solid var(--ms-blue);
+            border-radius: 8px; padding: 0.78rem 0.85rem; min-height: 9.1rem;
+            box-shadow: 0 10px 22px rgba(23, 32, 51, 0.045);
+        }
+        .optimizer-ok { border-left-color: var(--ms-green); }
+        .optimizer-warn { border-left-color: var(--ms-amber); }
+        .optimizer-bad { border-left-color: var(--ms-red); }
+        .optimizer-neutral { border-left-color: var(--ms-blue); }
+        .optimizer-top { display: flex; justify-content: space-between; gap: 0.55rem; align-items: center; }
+        .optimizer-top span { color: var(--ms-ink); font-size: 0.72rem; font-weight: 780; text-transform: uppercase; }
+        .optimizer-top small { color: var(--ms-muted); font-size: 0.72rem; font-weight: 680; }
+        .optimizer-title { color: var(--ms-ink); font-size: 0.94rem; font-weight: 780; line-height: 1.2; margin-top: 0.38rem; }
+        .optimizer-action { color: var(--ms-ink); font-size: 0.8rem; line-height: 1.3; margin-top: 0.28rem; }
+        .optimizer-impact { color: var(--ms-muted); font-size: 0.76rem; line-height: 1.25; margin-top: 0.24rem; }
+        .optimizer-owner { color: var(--ms-muted); font-size: 0.7rem; font-weight: 720; text-transform: uppercase; margin-top: 0.42rem; }
+        .export-package {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.75rem; align-items: center;
+            background: #ffffff; border: 1px solid var(--ms-line); border-radius: 8px;
+            padding: 0.9rem 1rem; margin: 0.2rem 0 0.85rem; box-shadow: var(--ms-shadow);
+        }
+        .export-kicker { color: var(--ms-muted); text-transform: uppercase; font-size: 0.72rem; font-weight: 760; }
+        .export-title { color: var(--ms-ink); font-size: 1.12rem; font-weight: 790; line-height: 1.2; }
+        .export-note { color: var(--ms-muted); font-size: 0.8rem; margin-top: 0.14rem; }
+        .export-stat { text-align: right; border-left: 1px solid var(--ms-line); padding-left: 1rem; min-width: 7rem; }
+        .export-stat span { color: var(--ms-muted); font-size: 0.72rem; font-weight: 720; display: block; }
+        .export-stat strong { color: var(--ms-ink); font-size: 1.12rem; line-height: 1.2; }
+        @media (max-width: 980px) {
+            .exec-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .gate-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .quality-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .optimizer-grid { grid-template-columns: 1fr; }
+            .launch-ribbon { grid-template-columns: 1fr; }
+            .launch-pills { justify-content: flex-start; }
+            .launch-money { text-align: left; }
+        }
+        @media (max-width: 640px) {
+            .exec-strip, .exec-hero, .gate-grid, .quality-grid, .quality-hero, .pattern-winner, .export-package { grid-template-columns: 1fr; }
+            .exec-score { text-align: left; }
+            .quality-total, .pattern-score, .export-stat { text-align: left; }
+            .export-stat { border-left: 0; border-top: 1px solid var(--ms-line); padding: 0.65rem 0 0; }
+        }
         [data-testid="stSidebar"] { border-right: 1px solid var(--ms-line); background: var(--ms-surface); }
+        [data-testid="stSidebar"] h2 { letter-spacing: 0; color: var(--ms-ink); }
+        [data-testid="stSidebar"] div[data-testid="stExpander"] {
+            border: 1px solid #dbe2ee; background: rgba(255,255,255,0.82); box-shadow: none;
+        }
+        button[kind="primary"], div[data-testid="stDownloadButton"] button {
+            border-radius: 6px !important; font-weight: 720 !important;
+        }
+        button[kind="primary"] {
+            background: #172033 !important; border: 1px solid #172033 !important;
+        }
+        div[data-testid="stTabs"] button {
+            border-radius: 6px 6px 0 0; font-weight: 680;
+        }
         [data-testid="stMetric"] {
             background: var(--ms-panel); border: 1px solid var(--ms-line); border-radius: 8px;
-            padding: 0.72rem 0.9rem;
+            padding: 0.72rem 0.9rem; box-shadow: 0 10px 24px rgba(23, 32, 51, 0.045);
         }
         .metric-blue [data-testid="stMetric"] { border-left: 3px solid var(--ms-blue); }
         .metric-green [data-testid="stMetric"] { border-left: 3px solid var(--ms-green); }
@@ -232,7 +337,7 @@ def app_css() -> None:
         .setup-chip.fit-warn { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
         div[data-testid="stPlotlyChart"] {
             border: 1px solid var(--ms-line); border-radius: 8px; overflow: hidden;
-            box-shadow: 0 10px 26px rgba(23, 32, 51, 0.06);
+            box-shadow: var(--ms-shadow);
         }
         [data-testid="stAlert"], div[data-testid="stExpander"], [data-testid="stDataFrame"] {
             border-radius: 8px;
@@ -250,9 +355,9 @@ def render_header() -> None:
             <div class="ms-header-icon">MS</div>
             <div>
                 <p class="ms-header-title">MiniSlicer Toolpath Planner</p>
-                <p class="ms-header-sub">Interactive FDM/DED previews, metrics, comparisons, and educational exports</p>
+                <p class="ms-header-sub">Launch desk for additive planning, quoting, readiness, and traceable exports</p>
             </div>
-            <div class="ms-header-badge">Job Planning Workbench</div>
+            <div class="ms-header-badge">Manufacturing Command Center</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -344,9 +449,6 @@ effective_angle = (
     else float(infill_angle)
 )
 
-boundary = shape_boundary(shape)
-perimeters = generate_inward_perimeters(shape, int(perimeter_count), float(perimeter_spacing))
-
 infill_shape = shape
 net_clearance = max(0.0, float(infill_clearance) - float(infill_overlap))
 if net_clearance > 0:
@@ -356,20 +458,27 @@ if net_clearance > 0:
     else:
         infill_shape = inset
 
-infill_lines = generate_infill(infill_shape, infill_pattern, effective_spacing, effective_angle)
+toolpath_settings = ToolpathSettings(
+    perimeter_count=int(perimeter_count),
+    perimeter_spacing_mm=float(perimeter_spacing),
+    infill_pattern=str(infill_pattern),
+    infill_spacing_mm=float(effective_spacing),
+    infill_angle_deg=float(effective_angle),
+    optimize_perimeters=bool(optimize_perimeters),
+    optimize_infill=bool(optimize_infill),
+    allow_line_reverse=bool(reverse_lines),
+    simplify_tolerance_mm=float(simplify_tolerance),
+    min_segment_length_mm=float(min_segment_length),
+)
 
-if optimize_perimeters:
-    perimeters = optimize_path_order(perimeters, allow_reverse=False)
-if optimize_infill:
-    infill_lines = optimize_path_order(infill_lines, allow_reverse=reverse_lines)
-if simplify_tolerance > 0:
-    perimeters = simplify_lines(perimeters, simplify_tolerance)
-    infill_lines = simplify_lines(infill_lines, simplify_tolerance)
-if min_segment_length > 0:
-    perimeters = filter_short_lines(perimeters, min_segment_length)
-    infill_lines = filter_short_lines(infill_lines, min_segment_length)
+_shape_wkt = shape.wkt
+_infill_wkt = infill_shape.wkt
 
-segments = build_ordered_segments(None, perimeters, infill_lines, int(layer_number))
+active_plan = _cached_plan_layer(_shape_wkt, _infill_wkt, toolpath_settings, int(layer_number))
+boundary = active_plan.boundary
+perimeters = active_plan.perimeters
+infill_lines = active_plan.infill_lines
+segments = active_plan.segments
 metrics = summarize_metrics(
     shape, segments, perimeters, infill_lines,
     print_speed_mm_s=float(print_speed),
@@ -382,29 +491,23 @@ metrics = summarize_metrics(
     perimeter_speed_mult=float(perimeter_speed_mult),
 )
 
-layer_count = max(1, math.ceil(float(model_height) / float(layer_height)))
-production_segments = segments
+layer_count = max(1, ceil(float(model_height) / float(layer_height)))
 production_layer_limit = 600
-if layer_count <= production_layer_limit:
-    production_segments = []
-    for prod_layer in range(1, layer_count + 1):
-        prod_angle = (
-            45.0 if alternate_angle and prod_layer % 2 == 1
-            else -45.0 if alternate_angle
-            else float(effective_angle)
-        )
-        prod_infill = infill_lines
-        if prod_angle != effective_angle:
-            prod_infill = generate_infill(infill_shape, infill_pattern, effective_spacing, prod_angle)
-            if optimize_infill:
-                prod_infill = optimize_path_order(prod_infill, allow_reverse=reverse_lines)
-            if simplify_tolerance > 0:
-                prod_infill = simplify_lines(prod_infill, simplify_tolerance)
-            if min_segment_length > 0:
-                prod_infill = filter_short_lines(prod_infill, min_segment_length)
-        production_segments.extend(
-            build_ordered_segments(None, perimeters, prod_infill, prod_layer)
-        )
+production_segments = _cached_production_segments(
+    _shape_wkt,
+    _infill_wkt,
+    toolpath_settings,
+    layer_count=layer_count,
+    alternate_angle=bool(alternate_angle),
+    layer_limit=production_layer_limit,
+)
+plan_fingerprint = build_plan_fingerprint(
+    shape,
+    toolpath_settings,
+    layer_count=layer_count,
+    process_mode=str(process_mode),
+    material=str(material_choice),
+)
 full_time_s = metrics["estimated_motion_time_s"] * layer_count
 full_weight_g = metrics["weight_g"] * layer_count
 full_cost = full_weight_g / 1000.0 * float(material_cost)
@@ -417,6 +520,13 @@ economics = estimate_job_economics(
     full_time_s=full_time_s,
     full_weight_g=full_weight_g,
     material_cost_per_kg=float(material_cost),
+    machine_rate_per_h=float(machine_rate_per_h),
+    labor_rate_per_h=float(labor_rate_per_h),
+    setup_time_min=float(setup_time_min),
+    postprocess_time_min=float(postprocess_time_min),
+    scrap_allowance_pct=float(scrap_allowance_pct),
+    margin_pct=float(margin_pct),
+    batch_quantity=int(batch_quantity),
 )
 min_x, min_y, max_x, max_y = shape.bounds
 fits_plate = not show_plate or (min_x >= 0 and min_y >= 0 and max_x <= plate_w and max_y <= plate_d)
@@ -445,7 +555,82 @@ readiness = assess_job_readiness(
     layer_count=layer_count,
 )
 program_risk = classify_program_risk(readiness, economics)
+commercial_fit = assess_commercial_fit(
+    economics=economics,
+    target_unit_price=float(target_unit_price),
+    max_lead_time_h=float(max_lead_time_h),
+)
+launch_score = compute_launch_score(
+    readiness=readiness,
+    risk=program_risk,
+    commercial_fit=commercial_fit,
+)
+production_enabled = (
+    readiness["status"] != "Blocked"
+    and str(process_mode).startswith("FDM")
+    and layer_count <= production_layer_limit
+)
+quality_scorecard = build_quality_scorecard(
+    readiness=readiness,
+    economics=economics,
+    commercial_fit=commercial_fit,
+    metrics=metrics,
+    production_enabled=production_enabled,
+    plan_fingerprint=plan_fingerprint,
+)
+pattern_ranking = _cached_rank_infill_patterns(_infill_wkt, tuple(PATTERNS), toolpath_settings)
+recommended_pattern = pattern_ranking[0]["pattern"] if pattern_ranking else str(infill_pattern)
+launch_recommendations = build_launch_recommendations(
+    readiness=readiness,
+    commercial_fit=commercial_fit,
+    metrics=metrics,
+    economics=economics,
+    quality_scorecard=quality_scorecard,
+    production_enabled=production_enabled,
+    fits_plate=fits_plate,
+    travel_ratio_pct=float(travel_ratio),
+    effective_spacing_mm=float(effective_spacing),
+    nozzle_diameter_mm=float(nozzle_diameter),
+    layer_count=layer_count,
+    recommended_pattern=str(recommended_pattern),
+)
+scenario_quantities = sorted({
+    1,
+    int(batch_quantity),
+    max(2, int(batch_quantity) * 2),
+    10,
+    25,
+})
+batch_scenarios = build_batch_scenarios(
+    metrics=metrics,
+    layer_count=layer_count,
+    layer_height_mm=float(layer_height),
+    nozzle_diameter_mm=float(nozzle_diameter),
+    print_speed_mm_s=float(print_speed),
+    full_time_s=full_time_s,
+    full_weight_g=full_weight_g,
+    material_cost_per_kg=float(material_cost),
+    machine_rate_per_h=float(machine_rate_per_h),
+    labor_rate_per_h=float(labor_rate_per_h),
+    setup_time_min=float(setup_time_min),
+    postprocess_time_min=float(postprocess_time_min),
+    scrap_allowance_pct=float(scrap_allowance_pct),
+    margin_pct=float(margin_pct),
+    target_unit_price=float(target_unit_price),
+    max_lead_time_h=float(max_lead_time_h),
+    quantities=scenario_quantities,
+)
+release_checklist = build_release_checklist(
+    readiness=readiness,
+    commercial_fit=commercial_fit,
+    production_enabled=production_enabled,
+    plan_fingerprint=plan_fingerprint,
+    export_segment_count=len(production_segments),
+)
 
+# ---------------------------------------------------------------------------
+# Top metrics strip
+# ---------------------------------------------------------------------------
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 metric_specs = [
     (m1, "metric-blue", "Path length", f"{metrics['total_path_length_mm']:.1f} mm", None, None),
@@ -480,6 +665,7 @@ summary_items = [
     ("Layer", f"{float(layer_height):.2f} mm - {layer_count} layers"),
     ("Material", material_choice),
     ("Mode", f"{process_mode} - {control_mode} controls"),
+    ("Plan", plan_fingerprint),
 ]
 summary_html = "".join(
     f'<div class="setup-chip"><span>{escape(label)}</span>{escape(str(value))}</div>'
@@ -491,103 +677,36 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-if readiness["status"] == "Blocked":
-    st.error(
-        f"Job readiness: {readiness['score']}/100 - blocked by "
-        f"{readiness['blockers']} critical issue(s). Open Advisor for the fix list."
-    )
-elif readiness["warnings"]:
-    st.warning(
-        f"Job readiness: {readiness['score']}/100 - review "
-        f"{readiness['warnings']} warning(s) before exporting."
-    )
-else:
-    st.success(f"Job readiness: {readiness['score']}/100 - setup is ready for planning review.")
+# ---------------------------------------------------------------------------
+# Recommended next action banner
+# ---------------------------------------------------------------------------
+render_next_action(
+    readiness=readiness,
+    commercial_fit=commercial_fit,
+    metrics=metrics,
+    economics=economics,
+    fits_plate=fits_plate,
+    travel_ratio=travel_ratio,
+    launch_score=launch_score,
+)
 
-tab_exec, tab_preview, tab_compare, tab_anim, tab_3d, tab_metrics, tab_advisor, tab_data, tab_export = st.tabs([
-    "Executive", "Preview", "Compare", "Animation", "3D", "Metrics", "Advisor", "Data", "Export",
-])
+render_launch_ribbon(
+    job_name=str(job_name),
+    customer_name=str(customer_name),
+    launch_score=launch_score,
+    readiness=readiness,
+    commercial_fit=commercial_fit,
+    program_risk=program_risk,
+    economics=economics,
+)
 
-with tab_exec:
-    risk_color = {"Low": "#15803d", "Medium": "#b45309", "High": "#b91c1c", "Blocked": "#991b1b"}.get(
-        program_risk, "#172033"
-    )
-    st.markdown(
-        f"""
-        <div class="exec-strip">
-            <div class="exec-card">
-                <div class="exec-label">Release State</div>
-                <div class="exec-value">{escape(readiness["status"])} - {readiness["score"]}/100</div>
-                <div class="exec-note">{readiness["blockers"]} blockers, {readiness["warnings"]} warnings</div>
-            </div>
-            <div class="exec-card">
-                <div class="exec-label">Quoted Part Cost</div>
-                <div class="exec-value">${economics["quoted_price"]:.2f}</div>
-                <div class="exec-note">${economics["cost_per_cm3"]:.2f}/cm3 including scrap and margin</div>
-            </div>
-            <div class="exec-card">
-                <div class="exec-label">Build Productivity</div>
-                <div class="exec-value">{economics["build_rate_cm3_h"]:.2f} cm3/h</div>
-                <div class="exec-note">{fmt_time(full_time_s)} machine time</div>
-            </div>
-            <div class="exec-card">
-                <div class="exec-label">Program Risk</div>
-                <div class="exec-value" style="color:{risk_color}">{escape(program_risk)}</div>
-                <div class="exec-note">{economics["volumetric_flow_mm3_s"]:.2f} mm3/s requested flow</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+# ---------------------------------------------------------------------------
+# Three-workspace tab layout: Design | Plan | Release
+# ---------------------------------------------------------------------------
+tab_design, tab_plan, tab_release = st.tabs(["Design", "Plan", "Release"])
 
-    ex1, ex2 = st.columns([1.2, 1])
-    with ex1:
-        st.markdown("### Production Decision")
-        decision_rows = {
-            "Geometry": source_label,
-            "Process": process_mode,
-            "Material": material_choice,
-            "Layers": layer_count,
-            "Path efficiency": f"{metrics['path_efficiency_pct']:.1f}%",
-            "Travel share": f"{travel_ratio:.1f}%",
-            "Material volume": f"{economics['volume_cm3']:.2f} cm3",
-            "Full segment export": f"{len(production_segments):,} moves",
-        }
-        st.dataframe(
-            [{"signal": key, "value": value} for key, value in decision_rows.items()],
-            hide_index=True,
-            width="stretch",
-        )
-    with ex2:
-        st.markdown("### Cost Stack")
-        st.bar_chart({
-            "USD": {
-                "Material": economics["material_cost"],
-                "Machine": economics["machine_cost"],
-                "Labor": economics["labor_cost"],
-                "Scrap + margin": max(
-                    0.0,
-                    economics["quoted_price"]
-                    - economics["material_cost"]
-                    - economics["machine_cost"]
-                    - economics["labor_cost"],
-                ),
-            }
-        })
-
-    st.markdown("### Top Actions")
-    if readiness["issues"]:
-        for issue in readiness["issues"][:4]:
-            if issue.severity == "blocker":
-                st.error(f"{issue.title}: {issue.action}")
-            elif issue.severity == "warning":
-                st.warning(f"{issue.title}: {issue.action}")
-            else:
-                st.info(f"{issue.title}: {issue.action}")
-    else:
-        st.success("This setup is clear for planning review. Export the job dossier for sign-off.")
-
-with tab_preview:
+# ---- Design -----------------------------------------------------------------
+with tab_design:
     ctrl_row = st.columns([2, 1, 1])
     preview_layer = ctrl_row[0].slider(
         "Layer preview", 1, min(layer_count, 50), min(int(layer_number), min(layer_count, 50)),
@@ -606,9 +725,10 @@ with tab_preview:
     )
     preview_infill = infill_lines
     if layer_angle != effective_angle:
-        preview_infill = generate_infill(infill_shape, infill_pattern, effective_spacing, layer_angle)
-        if optimize_infill:
-            preview_infill = optimize_path_order(preview_infill, allow_reverse=reverse_lines)
+        preview_infill = _cached_plan_layer(
+            _shape_wkt, _infill_wkt, toolpath_settings,
+            layer=preview_layer, infill_angle_deg=layer_angle,
+        ).infill_lines
 
     info_col1, info_col2, info_col3, info_col4 = st.columns(4)
     info_col1.caption(f"**Layer** {preview_layer} / {layer_count}")
@@ -655,124 +775,215 @@ with tab_preview:
         fig.update_layout(uirevision="preserve-preview-zoom")
     st.plotly_chart(fig, width="stretch")
 
-with tab_compare:
-    st.markdown("Compare two infill patterns side-by-side with the same shape and spacing settings.")
-    ca, cb = st.columns(2)
-    pattern_a = ca.selectbox(
-        "Pattern A", PATTERNS, index=PATTERNS.index(infill_pattern),
-        format_func=lambda p: f"{PATTERN_ICONS.get(p, '')} {p}",
-    )
-    pattern_b = cb.selectbox(
-        "Pattern B", PATTERNS, index=2,
-        format_func=lambda p: f"{PATTERN_ICONS.get(p, '')} {p}",
-    )
-
-    auto_compare = st.checkbox("Auto-compare on change", value=True)
-    run_compare = st.button("Compare now", type="primary") or auto_compare
-
-    if run_compare:
-        infill_a = generate_infill(infill_shape, pattern_a, effective_spacing, effective_angle)
-        infill_b = generate_infill(infill_shape, pattern_b, effective_spacing, effective_angle)
-        fig_cmp = create_comparison_figure(
-            boundary, perimeters, infill_a, infill_b,
-            pattern_a, pattern_b, line_width_scale, color_scheme,
+    if stl_bytes is not None:
+        st.markdown("---")
+        st.markdown("#### STL Multi-Layer Preview")
+        render_stl_multilayer_view(
+            stl_bytes,
+            stl_info,
+            stl_target_width,
+            float(layer_height),
+            int(perimeter_count),
+            float(perimeter_spacing),
+            infill_pattern,
+            float(effective_spacing),
+            float(effective_angle),
+            bool(optimize_infill),
+            bool(reverse_lines),
+            color_scheme,
+            shape,
+            layer_count,
         )
-        st.plotly_chart(fig_cmp, width="stretch")
-        cm1, cm2, cm3, cm4, cm5 = st.columns(5)
-        cm1.metric("A - Lines", len(infill_a))
-        cm2.metric("B - Lines", len(infill_b), delta=len(infill_b) - len(infill_a))
-        a_len = sum(line.length for line in infill_a)
-        b_len = sum(line.length for line in infill_b)
-        cm3.metric("A - Infill", f"{a_len:.1f} mm")
-        cm4.metric("B - Infill", f"{b_len:.1f} mm", delta=f"{b_len - a_len:+.1f} mm")
-        cm5.metric("Shorter by", f"{abs(b_len - a_len):.1f} mm")
     else:
-        st.info("Pick two patterns. Comparison updates automatically when **Auto-compare** is on.")
-
-with tab_anim:
-    if segments:
-        st.plotly_chart(create_animated_figure(boundary, segments), width="stretch")
-    else:
-        st.info("No segments to animate - try adjusting perimeter count or infill spacing.")
-
-with tab_3d:
-    render_stl_multilayer_view(
-        stl_bytes,
-        stl_info,
-        stl_target_width,
-        float(layer_height),
-        int(perimeter_count),
-        float(perimeter_spacing),
-        infill_pattern,
-        float(effective_spacing),
-        float(effective_angle),
-        bool(optimize_infill),
-        bool(reverse_lines),
-        color_scheme,
-        shape,
-        layer_count,
-    )
-
-with tab_metrics:
-    mg1, mg2, mg3, mg4, mg5 = st.columns(5)
-    mg1.metric("Shape area", f"{metrics['area_mm2']:.2f} mm^2")
-    mg2.metric("Bounding box", f"{metrics['bbox_width_mm']:.1f} x {metrics['bbox_height_mm']:.1f} mm")
-    mg3.metric("Material", f"{full_weight_g:.2f} g")
-    mg4.metric("Total cost", f"${full_cost:.2f}")
-    mg5.metric("Filament", f"{metrics['filament_length_m'] * layer_count:.2f} m")
-
-    if optimize_infill or optimize_perimeters:
-        raw_pt = total_travel_distance(
-            generate_inward_perimeters(shape, int(perimeter_count), float(perimeter_spacing))
-        )
-        raw_it = total_travel_distance(
-            generate_infill(infill_shape, infill_pattern, effective_spacing, effective_angle)
-        )
-        opt_pt = total_travel_distance(perimeters) if optimize_perimeters else raw_pt
-        opt_it = total_travel_distance(infill_lines) if optimize_infill else raw_it
-        raw_total = raw_pt + raw_it
-        opt_total = opt_pt + opt_it
-        saving_mm = max(0.0, raw_total - opt_total)
-        saving_pct = 100.0 * saving_mm / raw_total if raw_total > 0 else 0.0
-        with st.expander("Path Optimization Results", expanded=True):
-            oc1, oc2, oc3 = st.columns(3)
-            oc1.metric("Travel before NN", f"{raw_total:.1f} mm")
-            oc2.metric(
-                "Travel after NN", f"{opt_total:.1f} mm",
-                delta=f"-{saving_mm:.1f} mm" if saving_mm > 0 else "no change",
-                delta_color="inverse",
+        with st.expander("3D / Multi-layer preview", expanded=False):
+            st.info(
+                "Import an STL file to enable multi-layer and 3D stack views. "
+                "Use the Import controls in the sidebar to upload an STL."
             )
-            oc3.metric("Travel saved", f"{saving_pct:.1f}%")
 
-    mc1, mc2 = st.columns(2)
-    with mc1:
-        st.plotly_chart(create_metrics_figure(metrics, print_speed, travel_speed), width="stretch")
-    with mc2:
-        if infill_lines:
-            st.plotly_chart(create_infill_length_histogram(infill_lines, print_speed), width="stretch")
+# ---- Plan -------------------------------------------------------------------
+with tab_plan:
+    with st.expander("Pattern Ranking & Comparison", expanded=True):
+        st.markdown("### Pattern Ranking")
+        ranking = pattern_ranking
+        render_pattern_ranking(ranking)
+
+        if ranking:
+            # Decision-oriented summary: label each pattern's best quality
+            best_speed = min(ranking, key=lambda r: r["line_count"])
+            best_travel = min(ranking, key=lambda r: r["travel_mm"])
+            best_coverage = max(ranking, key=lambda r: r["path_mm"])
+            best_efficiency = max(ranking, key=lambda r: r["efficiency_pct"])
+            decision_items = [
+                ("Fewest moves (fastest)", best_speed["pattern"], f"{best_speed['line_count']} lines"),
+                ("Lowest travel", best_travel["pattern"], f"{best_travel['travel_mm']:.1f} mm travel"),
+                ("Most coverage", best_coverage["pattern"], f"{best_coverage['path_mm']:.1f} mm path"),
+                ("Best efficiency", best_efficiency["pattern"], f"{best_efficiency['efficiency_pct']:.1f}%"),
+            ]
+            di_cols = st.columns(4)
+            for col, (label, pattern, stat) in zip(di_cols, decision_items):
+                col.metric(label, pattern, stat)
+
+        st.markdown("### Head-to-Head Inspection")
+        ca, cb = st.columns(2)
+        recommended_a = ranking[0]["pattern"] if ranking else infill_pattern
+        recommended_b = ranking[1]["pattern"] if len(ranking) > 1 else "Grid"
+        pattern_a = ca.selectbox(
+            "Pattern A", PATTERNS, index=PATTERNS.index(recommended_a),
+            format_func=lambda p: f"{PATTERN_ICONS.get(p, '')} {p}",
+        )
+        pattern_b = cb.selectbox(
+            "Pattern B", PATTERNS, index=PATTERNS.index(recommended_b),
+            format_func=lambda p: f"{PATTERN_ICONS.get(p, '')} {p}",
+        )
+
+        auto_compare = st.checkbox("Auto-compare on change", value=True)
+        run_compare = st.button("Compare now", type="primary") or auto_compare
+
+        if run_compare:
+            infill_a = _cached_plan_layer(
+                _shape_wkt, _infill_wkt,
+                replace(toolpath_settings, infill_pattern=pattern_a),
+                layer=int(layer_number),
+            ).infill_lines
+            infill_b = _cached_plan_layer(
+                _shape_wkt, _infill_wkt,
+                replace(toolpath_settings, infill_pattern=pattern_b),
+                layer=int(layer_number),
+            ).infill_lines
+            fig_cmp = create_comparison_figure(
+                boundary, perimeters, infill_a, infill_b,
+                pattern_a, pattern_b, line_width_scale, color_scheme,
+            )
+            st.plotly_chart(fig_cmp, width="stretch")
+            cm1, cm2, cm3, cm4, cm5 = st.columns(5)
+            cm1.metric("A - Lines", len(infill_a))
+            cm2.metric("B - Lines", len(infill_b), delta=len(infill_b) - len(infill_a))
+            a_len = sum(line.length for line in infill_a)
+            b_len = sum(line.length for line in infill_b)
+            cm3.metric("A - Infill", f"{a_len:.1f} mm")
+            cm4.metric("B - Infill", f"{b_len:.1f} mm", delta=f"{b_len - a_len:+.1f} mm")
+            cm5.metric("Shorter by", f"{abs(b_len - a_len):.1f} mm")
         else:
-            st.info("No infill lines to show histogram for.")
+            st.info("Pick two patterns. Comparison updates automatically when **Auto-compare** is on.")
 
-    with st.expander("Raw metrics", expanded=False):
-        st.json({
-            "total_path_mm": f"{metrics['total_path_length_mm']:.2f}",
-            "perimeter_mm": f"{metrics['perimeter_length_mm']:.2f}",
-            "infill_mm": f"{metrics['infill_length_mm']:.2f}",
-            "travel_mm": f"{metrics['travel_length_mm']:.2f}",
-            "path_efficiency_%": f"{metrics['path_efficiency_pct']:.1f}",
-            "layer_time_s": f"{metrics['estimated_motion_time_s']:.2f}",
-            "full_build_s": f"{full_time_s:.2f}",
-            "weight_g/layer": f"{metrics['weight_g']:.4f}",
-            "weight_g/total": f"{full_weight_g:.2f}",
-            "filament_m/layer": f"{metrics['filament_length_m']:.3f}",
-            "material_vol_mm3": f"{metrics['material_volume_mm3']:.2f}",
-        })
+    with st.expander("Toolpath Animation", expanded=False):
+        if segments:
+            st.plotly_chart(create_animated_figure(boundary, segments), width="stretch")
+        else:
+            st.info("No segments to animate - try adjusting perimeter count or infill spacing.")
 
-with tab_advisor:
-    adv_col1, adv_col2 = st.columns([2, 1])
+    with st.expander("Metrics Detail", expanded=False):
+        mg1, mg2, mg3, mg4, mg5 = st.columns(5)
+        mg1.metric("Shape area", f"{metrics['area_mm2']:.2f} mm^2")
+        mg2.metric("Bounding box", f"{metrics['bbox_width_mm']:.1f} x {metrics['bbox_height_mm']:.1f} mm")
+        mg3.metric("Material", f"{full_weight_g:.2f} g")
+        mg4.metric("Total cost", f"${full_cost:.2f}")
+        mg5.metric("Filament", f"{metrics['filament_length_m'] * layer_count:.2f} m")
 
-    with adv_col1:
-        st.markdown("### Job Readiness")
+        if optimize_infill or optimize_perimeters:
+            raw_pt = total_travel_distance(
+                generate_inward_perimeters(shape, int(perimeter_count), float(perimeter_spacing))
+            )
+            raw_it = total_travel_distance(
+                generate_infill(infill_shape, infill_pattern, effective_spacing, effective_angle)
+            )
+            opt_pt = total_travel_distance(perimeters) if optimize_perimeters else raw_pt
+            opt_it = total_travel_distance(infill_lines) if optimize_infill else raw_it
+            raw_total = raw_pt + raw_it
+            opt_total = opt_pt + opt_it
+            saving_mm = max(0.0, raw_total - opt_total)
+            saving_pct = 100.0 * saving_mm / raw_total if raw_total > 0 else 0.0
+            with st.expander("Path Optimization Results", expanded=True):
+                oc1, oc2, oc3 = st.columns(3)
+                oc1.metric("Travel before NN", f"{raw_total:.1f} mm")
+                oc2.metric(
+                    "Travel after NN", f"{opt_total:.1f} mm",
+                    delta=f"-{saving_mm:.1f} mm" if saving_mm > 0 else "no change",
+                    delta_color="inverse",
+                )
+                oc3.metric("Travel saved", f"{saving_pct:.1f}%")
+
+        mc1, mc2 = st.columns(2)
+        with mc1:
+            st.plotly_chart(create_metrics_figure(metrics, print_speed, travel_speed), width="stretch")
+        with mc2:
+            if infill_lines:
+                st.plotly_chart(create_infill_length_histogram(infill_lines, print_speed), width="stretch")
+            else:
+                st.info("No infill lines to show histogram for.")
+
+        with st.expander("Raw metrics", expanded=False):
+            st.json({
+                "total_path_mm": f"{metrics['total_path_length_mm']:.2f}",
+                "perimeter_mm": f"{metrics['perimeter_length_mm']:.2f}",
+                "infill_mm": f"{metrics['infill_length_mm']:.2f}",
+                "travel_mm": f"{metrics['travel_length_mm']:.2f}",
+                "path_efficiency_%": f"{metrics['path_efficiency_pct']:.1f}",
+                "layer_time_s": f"{metrics['estimated_motion_time_s']:.2f}",
+                "full_build_s": f"{full_time_s:.2f}",
+                "weight_g/layer": f"{metrics['weight_g']:.4f}",
+                "weight_g/total": f"{full_weight_g:.2f}",
+                "filament_m/layer": f"{metrics['filament_length_m']:.3f}",
+                "material_vol_mm3": f"{metrics['material_volume_mm3']:.2f}",
+            })
+
+# ---- Release ----------------------------------------------------------------
+with tab_release:
+    # Executive summary
+    render_executive_dashboard(
+        job_name=str(job_name),
+        job_id=str(job_id),
+        customer_name=str(customer_name),
+        owner_name=str(owner_name),
+        source_label=source_label,
+        process_mode=str(process_mode),
+        material_choice=material_choice,
+        batch_quantity=int(batch_quantity),
+        layer_count=layer_count,
+        production_segment_count=len(production_segments),
+        metrics=metrics,
+        economics=economics,
+        readiness=readiness,
+        commercial_fit=commercial_fit,
+        program_risk=program_risk,
+        launch_score=launch_score,
+        travel_ratio=travel_ratio,
+        target_unit_price=float(target_unit_price),
+        quote_profile=str(quote_profile),
+        max_lead_time_h=float(max_lead_time_h),
+        machine_rate_per_h=float(machine_rate_per_h),
+        labor_rate_per_h=float(labor_rate_per_h),
+        setup_time_min=float(setup_time_min),
+        postprocess_time_min=float(postprocess_time_min),
+        scrap_allowance_pct=float(scrap_allowance_pct),
+        margin_pct=float(margin_pct),
+    )
+    st.markdown("### Release Gates")
+    render_release_gate_matrix(
+        readiness=readiness,
+        commercial_fit=commercial_fit,
+        program_risk=program_risk,
+        launch_score=launch_score,
+        production_enabled=production_enabled,
+        export_segment_count=len(production_segments),
+    )
+
+    st.markdown("---")
+    st.markdown("### Launch Optimizer")
+    render_launch_optimizer(launch_recommendations, batch_scenarios, release_checklist)
+
+    st.markdown("---")
+
+    # Quality scorecard + Advisor side by side
+    rel_left, rel_right = st.columns([3, 2])
+
+    with rel_left:
+        st.markdown("### Quality Scorecard")
+        render_quality_scorecard(quality_scorecard)
+
+    with rel_right:
+        st.markdown("### Advisor")
         st.progress(readiness["score"] / 100.0, text=f"{readiness['status']} - {readiness['score']}/100")
         if not readiness["issues"]:
             st.success("All automated checks passed for planning review.")
@@ -785,29 +996,41 @@ with tab_advisor:
                     st.warning(message)
                 else:
                     st.info(message)
-
-    with adv_col2:
-        st.markdown("### Release Snapshot")
+        st.markdown("#### Release Snapshot")
         ad1, ad2 = st.columns(2)
         ad1.metric("Travel share", f"{travel_ratio:.1f}%", delta_color="inverse")
         ad2.metric("Path efficiency", f"{metrics['path_efficiency_pct']:.1f}%")
         st.metric("Blockers", readiness["blockers"])
         st.metric("Warnings", readiness["warnings"])
-        st.metric("Full layers", layer_count)
+        st.metric("Launch score", f"{launch_score}/100")
+        st.metric("Commercial fit", commercial_fit["status"])
         density_actual = (
             100 * float(nozzle_diameter) / max(effective_spacing, 0.01)
             if effective_spacing > 0 else 0
         )
         st.metric("Actual density", f"{min(density_actual, 100):.0f}%")
 
-with tab_data:
-    df = segments_to_dataframe(segments)
-    st.markdown(f"**{len(df)} segments** - columns: `type`, `x0`, `y0`, `x1`, `y1`, `length_mm`, `layer`")
-    st.dataframe(df, width="stretch")
+    st.markdown("---")
 
-with tab_export:
+    # Segment data
+    with st.expander("Segment Ledger", expanded=False):
+        df = segments_to_dataframe(segments)
+        st.caption(
+            f"{len(df):,} active-layer segments with stable export columns for downstream QA, quoting, and traceability."
+        )
+        st.dataframe(df, width="stretch")
+
+    # Export panel
+    st.markdown("### Export")
     params = {
         "shape_type": source_label, "process_mode": process_mode, "profile": profile,
+        "plan_fingerprint": plan_fingerprint,
+        "job_metadata": {
+            "job_name": job_name,
+            "job_id": job_id,
+            "customer_name": customer_name,
+            "owner_name": owner_name,
+        },
         "perimeter_count": int(perimeter_count), "perimeter_spacing_mm": float(perimeter_spacing),
         "infill_pattern": infill_pattern, "infill_spacing_mm": float(effective_spacing),
         "infill_angle_deg": float(effective_angle), "layer_height_mm": float(layer_height),
@@ -818,6 +1041,24 @@ with tab_export:
         "readiness": readiness_to_dict(readiness),
         "economics": economics,
         "program_risk": program_risk,
+        "launch_score": launch_score,
+        "commercial_fit": commercial_fit,
+        "quality_scorecard": quality_scorecard,
+        "launch_recommendations": launch_recommendations,
+        "batch_scenarios": batch_scenarios,
+        "release_checklist": release_checklist,
+        "business_assumptions": {
+            "quote_profile": quote_profile,
+            "batch_quantity": int(batch_quantity),
+            "target_unit_price": float(target_unit_price),
+            "machine_rate_per_h": float(machine_rate_per_h),
+            "labor_rate_per_h": float(labor_rate_per_h),
+            "setup_time_min": float(setup_time_min),
+            "postprocess_time_min": float(postprocess_time_min),
+            "scrap_allowance_pct": float(scrap_allowance_pct),
+            "margin_pct": float(margin_pct),
+            "max_lead_time_h": float(max_lead_time_h),
+        },
         "production_export": {
             "layer_count": int(layer_count),
             "segment_count": len(production_segments),
@@ -833,7 +1074,12 @@ with tab_export:
         "MiniSlicer Toolpath Report",
         "=" * 40,
         f"Readiness:      {readiness['status']} ({readiness['score']}/100)",
+        f"Launch score:   {launch_score}/100",
+        f"Commercial fit: {commercial_fit['status']}",
+        f"Plan ID:        {plan_fingerprint}",
         f"Generated:      layer {int(layer_number)} of {layer_count}",
+        f"Job:            {job_id} - {job_name}",
+        f"Customer:       {customer_name}",
         f"Profile:        {profile}",
         f"Process:        {process_mode}",
         f"Shape:          {source_label}",
@@ -851,7 +1097,8 @@ with tab_export:
         f"Layers:         {layer_count}",
         f"Time estimate:  {fmt_time(full_time_s)}",
         f"Material:       {full_weight_g:.2f} g ({metrics['filament_length_m'] * layer_count:.2f} m filament)",
-        f"Cost estimate:  ${full_cost:.2f}",
+        f"Unit quote:     ${economics['quoted_price']:.2f}",
+        f"Batch quote:    ${economics['quoted_batch_price']:.2f} ({int(batch_quantity)} pcs)",
         f"Build plate fit:{' yes' if fits_plate else ' NO - shape outside plate'}",
         "",
         "Readiness Findings",
@@ -860,7 +1107,7 @@ with tab_export:
         "Planning output only - validate machine-specific start/end code and process limits before production.",
     ])
     dossier_md = generate_job_dossier_markdown(
-        job_name=source_label,
+        job_name=str(job_name),
         params=params,
         metrics=metrics,
         readiness=readiness,
@@ -869,6 +1116,12 @@ with tab_export:
         full_weight_g=full_weight_g,
         layer_count=layer_count,
         risk=program_risk,
+        commercial_fit=commercial_fit,
+        launch_score=launch_score,
+        quality_scorecard=quality_scorecard,
+        recommendations=launch_recommendations,
+        batch_scenarios=batch_scenarios,
+        release_checklist=release_checklist,
     )
     dossier_html = generate_job_dossier_html(dossier_md)
     render_export_panel(
