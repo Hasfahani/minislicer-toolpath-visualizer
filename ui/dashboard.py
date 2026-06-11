@@ -449,6 +449,51 @@ def render_ded_process_panel(ded: dict[str, Any] | None) -> None:
         )
 
 
+def render_partner_fit_panel(fit: dict[str, Any] | None) -> None:
+    """Render manufacturing-partner suitability for high-mix metal jobs."""
+    if not fit:
+        return
+
+    st.markdown("### Manufacturing Partner Fit")
+    p1, p2, p3, p4 = st.columns(4)
+    p1.metric("Fit score", f"{int(fit['score'])}/100", fit["verdict"])
+    p2.metric("Service estimate", _money(float(fit["service_unit_estimate"])))
+    p3.metric("Conventional estimate", _money(float(fit["conventional_unit_estimate"])))
+    p4.metric("Value delta", _money(float(fit["value_delta"])), f"{float(fit['value_delta_pct']):+.1f}%")
+
+    left, right = st.columns([1.05, 0.95])
+    with left:
+        st.markdown("#### Intake Summary")
+        st.dataframe(
+            [
+                {"field": "Application", "value": fit["application_type"]},
+                {"field": "Conventional route", "value": fit["conventional_route"]},
+                {"field": "Urgency", "value": fit["urgency"]},
+                {"field": "Qualification", "value": fit["qualification_level"]},
+                {"field": "Material strategy", "value": fit["material_strategy"]},
+                {"field": "Annual quantity", "value": f"{int(fit['annual_quantity'])} pcs"},
+            ],
+            hide_index=True,
+            width="stretch",
+        )
+        if fit["blockers"]:
+            for blocker in fit["blockers"]:
+                st.warning(blocker)
+    with right:
+        st.markdown("#### Client Deliverables")
+        st.dataframe(
+            [{"deliverable": item} for item in fit["deliverables"]],
+            hide_index=True,
+            width="stretch",
+        )
+        st.markdown("#### Decision Signals")
+        st.dataframe(
+            [{"signal": item} for item in fit["signals"]],
+            hide_index=True,
+            width="stretch",
+        )
+
+
 def render_next_action(
     *,
     readiness: dict[str, Any],

@@ -125,6 +125,34 @@ def render_business_controls(advanced: bool) -> dict[str, Any]:
         batch_quantity = q1.number_input("Batch qty", min_value=1, value=1, step=1)
         target_unit_price = q2.number_input("Target $/part", min_value=0.0, value=0.0, step=5.0)
 
+        application_type = st.selectbox(
+            "Application",
+            [
+                "General machine component",
+                "Wear part / crusher component",
+                "Aerospace tooling",
+                "Repair / cladding",
+                "Bridge production / spare part",
+            ],
+        )
+        route_col, urgency_col = st.columns(2)
+        conventional_route = route_col.selectbox(
+            "Conventional route",
+            ["Casting", "Forging", "Machining from billet", "Weld fabrication"],
+        )
+        urgency = urgency_col.selectbox(
+            "Delivery driver",
+            ["Normal procurement", "Expedite", "Line-down / launch critical"],
+        )
+        qualification_level = st.selectbox(
+            "Qualification level",
+            ["Prototype", "Industrial", "Aerospace / safety critical"],
+        )
+        material_strategy = st.selectbox(
+            "Material strategy",
+            ["Single material", "Wear-facing / gradient", "Repair overlay"],
+        )
+
         quote_profile = st.segmented_control(
             "Quote profile",
             ["Startup", "Service Bureau", "Enterprise Pilot"],
@@ -188,6 +216,12 @@ def render_business_controls(advanced: bool) -> dict[str, Any]:
             max_lead_time_h = st.number_input(
                 "Max machine time (h)", min_value=0.0, value=float(rates["max_lead_time_h"]), step=1.0,
             )
+            st.markdown("**Customer Intake**")
+            intake1, intake2 = st.columns(2)
+            finish_tolerance_mm = intake1.number_input("Finish tolerance (mm)", 0.01, value=0.5, step=0.05)
+            annual_quantity = intake2.number_input("Annual demand", min_value=1, value=1, step=1)
+            ndt_required = st.checkbox("NDT / inspection package required", value=True)
+            redesign_required = st.checkbox("Redesign for additive required", value=True)
         else:
             machine_rate_per_h = rates["machine_rate_per_h"]
             labor_rate_per_h = rates["labor_rate_per_h"]
@@ -196,6 +230,10 @@ def render_business_controls(advanced: bool) -> dict[str, Any]:
             scrap_allowance_pct = rates["scrap_allowance_pct"]
             margin_pct = rates["margin_pct"]
             max_lead_time_h = rates["max_lead_time_h"]
+            finish_tolerance_mm = 0.5
+            annual_quantity = int(batch_quantity)
+            ndt_required = True
+            redesign_required = True
 
     return locals()
 

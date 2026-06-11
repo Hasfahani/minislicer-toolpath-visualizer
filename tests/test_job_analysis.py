@@ -2,6 +2,7 @@
 
 from src.job_analysis import (
     assess_commercial_fit,
+    assess_manufacturing_partner_fit,
     build_batch_scenarios,
     build_ded_recommendations,
     build_launch_recommendations,
@@ -443,6 +444,59 @@ def test_ded_recommendations_flag_envelope_feed_and_heat_risks() -> None:
     assert any(row["title"] == "High heat input" for row in recommendations)
 
 
+def test_manufacturing_partner_fit_scores_urgent_low_volume_ded_candidate() -> None:
+    ded = {
+        "lead_time_compression_pct": 88.0,
+        "material_saved_pct": 72.0,
+        "envelope_fit": True,
+        "cell_time_h": 24.0,
+    }
+    fit = assess_manufacturing_partner_fit(
+        ded_analysis=ded,
+        economics={"quoted_price": 4000.0, "build_hours": 24.0},
+        commercial_fit={"status": "Fit"},
+        application_type="Wear part / crusher component",
+        conventional_route="Casting",
+        urgency="Line-down / launch critical",
+        qualification_level="Industrial",
+        material_strategy="Wear-facing / gradient",
+        finish_tolerance_mm=0.5,
+        annual_quantity=3,
+        ndt_required=True,
+        redesign_required=True,
+    )
+
+    assert fit["score"] >= 70
+    assert fit["verdict"] in {"Strong candidate", "Engineering review"}
+    assert fit["value_delta"] > 0
+    assert "Material transition and wear-zone strategy" in fit["deliverables"]
+
+
+def test_manufacturing_partner_fit_flags_tight_tolerance_blocker() -> None:
+    fit = assess_manufacturing_partner_fit(
+        ded_analysis={
+            "lead_time_compression_pct": 30.0,
+            "material_saved_pct": 20.0,
+            "envelope_fit": True,
+            "cell_time_h": 12.0,
+        },
+        economics={"quoted_price": 1000.0, "build_hours": 12.0},
+        commercial_fit={"status": "Review"},
+        application_type="General machine component",
+        conventional_route="Machining from billet",
+        urgency="Normal procurement",
+        qualification_level="Industrial",
+        material_strategy="Single material",
+        finish_tolerance_mm=0.05,
+        annual_quantity=80,
+        ndt_required=False,
+        redesign_required=False,
+    )
+
+    assert fit["score"] < 65
+    assert any("Tolerance" in blocker for blocker in fit["blockers"])
+
+
 def test_dossier_contains_traceable_summary() -> None:
     economics = estimate_job_economics(
         metrics=_metrics(),
@@ -527,6 +581,17 @@ def test_dossier_contains_traceable_summary() -> None:
             "additive_lead_weeks": 0.2,
             "lead_time_compression_pct": 95.0,
         },
+        partner_fit={
+            "score": 86,
+            "verdict": "Strong candidate",
+            "application_type": "Wear part / crusher component",
+            "conventional_route": "Casting",
+            "service_unit_estimate": 1200.0,
+            "conventional_unit_estimate": 1800.0,
+            "value_delta": 600.0,
+            "value_delta_pct": 33.3,
+            "deliverables": ["DfAM redesign review", "Post-machining and inspection plan"],
+        },
     )
     html = generate_job_dossier_html(dossier)
 
@@ -539,5 +604,6 @@ def test_dossier_contains_traceable_summary() -> None:
     assert "Batch Scenarios" in dossier
     assert "What-If Playbook" in dossier
     assert "DED Process Model" in dossier
+    assert "Manufacturing Partner Fit" in dossier
     assert "Release Checklist" in dossier
     assert "<!doctype html>" in html

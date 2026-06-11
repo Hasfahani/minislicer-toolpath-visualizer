@@ -17,9 +17,9 @@ the target machine before release.
 | Toolpaths | Inward perimeters, parallel, zigzag, grid, triangular, honeycomb, and concentric infill |
 | Planning Engine | Typed toolpath settings, reusable layer planner, full-build segment generation, pattern ranking, and deterministic plan fingerprints |
 | Planning | Per-layer and full-build path estimates, acceleration-aware motion time, travel share, material use, wire-feed balance, heat input, and deposition rate |
-| Executive Review | Launch score, readiness score, program risk, unit/batch quote, productivity, DED process model, launch optimizer, what-if playbook, batch scenarios, release checklist, quality scorecard, and cost-stack view |
+| Executive Review | Launch score, readiness score, program risk, unit/batch quote, productivity, DED process model, manufacturing partner fit, launch optimizer, what-if playbook, batch scenarios, release checklist, quality scorecard, and cost-stack view |
 | Quality Gates | Plate fit, missing paths, tall layer height, sparse infill, high travel, heavy path count, tall builds, and volumetric flow |
-| Commercial Controls | Customer/job metadata, batch quantity, target price, machine rate, labor rate, setup time, postprocess time, scrap, margin, conventional lead time, and machine-capacity guardrails |
+| Commercial Controls | Customer/job metadata, application type, conventional route, urgency, qualification level, material strategy, batch quantity, target price, machine rate, labor rate, setup time, postprocess time, scrap, margin, conventional lead time, and machine-capacity guardrails |
 | Visualization | Toolpath, extrusion-width, speed map, time map, density map, animation, and 3D layer stack views |
 | Export | CSV, JSON, SVG, preview G-code, guarded FDM production G-code, markdown dossier, HTML dossier, and text report |
 | Reproducibility | JSON parameter snapshots can be re-imported to recreate prior planning runs |
@@ -68,9 +68,11 @@ streamlit run app.py
 5. Review the Executive, Quality, and Advisor tabs before exporting.
 6. In Metal mode, review the DED process model for envelope fit, wire demand,
    heat input, energy, material savings, and lead-time compression.
-7. Use the Launch Optimizer to review top moves, what-if levers, batch scenarios, and release checklist status.
-8. Export a dossier for sign-off, plus data files for engineering traceability.
-9. Use production G-code only when readiness is unblocked, process mode is FDM,
+7. Review Manufacturing Partner Fit for DfAM suitability, route comparison,
+   qualification burden, service deliverables, and value versus conventional sourcing.
+8. Use the Launch Optimizer to review top moves, what-if levers, batch scenarios, and release checklist status.
+9. Export a dossier for sign-off, plus data files for engineering traceability.
+10. Use production G-code only when readiness is unblocked, process mode is FDM,
    and the selected machine profile matches the physical printer.
 
 ## Engineering Model
@@ -93,6 +95,12 @@ mass flow from wire diameter and feed rate, deposited kg/h from deposition
 efficiency, heat input from arc voltage/current and travel speed, energy per kg,
 near-net machining allowance, feedstock required, material saved versus billet
 buy-to-fly, build-envelope utilization, and additive lead-time compression.
+
+The manufacturing-partner fit model scores whether a customer job is a good
+candidate for a large-format metal AM service workflow. It combines lead-time
+compression, material reduction, conventional route, urgency, annual quantity,
+qualification burden, tolerances, inspection needs, and redesign effort into a
+fit verdict with expected deliverables for customer collaboration.
 
 The quote model is transparent by design. Setup labor is amortized across the
 batch, while machine time, material, and postprocess labor remain per-part

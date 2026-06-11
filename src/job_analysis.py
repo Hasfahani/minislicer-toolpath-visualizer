@@ -769,6 +769,156 @@ def build_ded_recommendations(ded: dict[str, Any]) -> list[dict[str, Any]]:
     return recommendations
 
 
+def assess_manufacturing_partner_fit(
+    *,
+    ded_analysis: dict[str, Any] | None,
+    economics: dict[str, float],
+    commercial_fit: dict[str, Any],
+    application_type: str,
+    conventional_route: str,
+    urgency: str,
+    qualification_level: str,
+    material_strategy: str,
+    finish_tolerance_mm: float,
+    annual_quantity: int,
+    ndt_required: bool,
+    redesign_required: bool,
+) -> dict[str, Any]:
+    """Score fit for a high-mix large-metal-AM manufacturing service workflow."""
+    ded = ded_analysis or {}
+    lead_compression = float(ded.get("lead_time_compression_pct", 0.0))
+    material_saved = float(ded.get("material_saved_pct", 0.0))
+    envelope_fit = bool(ded.get("envelope_fit", True))
+    cell_time_h = float(ded.get("cell_time_h", economics.get("build_hours", 0.0)))
+    unit_quote = float(economics.get("quoted_price", 0.0))
+    quantity = max(int(annual_quantity), 1)
+
+    route_multiplier = {
+        "Casting": 1.65,
+        "Forging": 1.85,
+        "Machining from billet": 1.45,
+        "Weld fabrication": 1.20,
+    }.get(conventional_route, 1.25)
+    urgency_multiplier = {
+        "Normal procurement": 1.00,
+        "Expedite": 1.12,
+        "Line-down / launch critical": 1.28,
+    }.get(urgency, 1.00)
+    qualification_multiplier = {
+        "Prototype": 0.10,
+        "Industrial": 0.18,
+        "Aerospace / safety critical": 0.35,
+    }.get(qualification_level, 0.18)
+    inspection_multiplier = 0.08 if ndt_required else 0.03
+    redesign_multiplier = 0.12 if redesign_required else 0.04
+
+    conventional_unit_estimate = unit_quote * route_multiplier * urgency_multiplier
+    qualification_cost = unit_quote * qualification_multiplier
+    inspection_cost = unit_quote * inspection_multiplier
+    redesign_cost = unit_quote * redesign_multiplier
+    service_unit_estimate = unit_quote + qualification_cost + inspection_cost + redesign_cost
+    value_delta = conventional_unit_estimate - service_unit_estimate
+    value_delta_pct = (
+        100.0 * value_delta / conventional_unit_estimate
+        if conventional_unit_estimate > 0 else 0.0
+    )
+
+    lead_score = _clamp_score(lead_compression)
+    material_score = _clamp_score(material_saved)
+    route_score = {
+        "Casting": 82,
+        "Forging": 88,
+        "Machining from billet": 76,
+        "Weld fabrication": 64,
+    }.get(conventional_route, 70)
+    urgency_score = {
+        "Normal procurement": 58,
+        "Expedite": 78,
+        "Line-down / launch critical": 94,
+    }.get(urgency, 58)
+    quantity_score = 82 if quantity <= 5 else 68 if quantity <= 25 else 44
+    tolerance_penalty = 16 if finish_tolerance_mm < 0.15 else 8 if finish_tolerance_mm < 0.35 else 0
+    qualification_penalty = {
+        "Prototype": 0,
+        "Industrial": 8,
+        "Aerospace / safety critical": 20,
+    }.get(qualification_level, 8)
+    multi_material_bonus = 8 if material_strategy != "Single material" else 0
+    route_fit_score = round(
+        0.23 * lead_score
+        + 0.20 * material_score
+        + 0.17 * route_score
+        + 0.15 * urgency_score
+        + 0.12 * quantity_score
+        + 0.13 * max(0, min(100, value_delta_pct + 50))
+        + multi_material_bonus
+        - tolerance_penalty
+        - qualification_penalty
+    )
+    if not envelope_fit:
+        route_fit_score -= 35
+    if commercial_fit.get("status") == "No-bid":
+        route_fit_score -= 20
+    route_fit_score = max(0, min(100, route_fit_score))
+
+    if route_fit_score >= 82:
+        verdict = "Strong candidate"
+    elif route_fit_score >= 65:
+        verdict = "Engineering review"
+    elif route_fit_score >= 45:
+        verdict = "Niche / conditional"
+    else:
+        verdict = "Poor fit"
+
+    deliverables = [
+        "Customer geometry and requirements intake",
+        "DfAM redesign review" if redesign_required else "Geometry manufacturability review",
+        "DED route simulation and build envelope check",
+        "Wire, energy, lead-time, and material-savings estimate",
+        "Post-machining and inspection plan",
+    ]
+    if ndt_required:
+        deliverables.append("NDT / inspection evidence package")
+    if material_strategy != "Single material":
+        deliverables.append("Material transition and wear-zone strategy")
+    if qualification_level == "Aerospace / safety critical":
+        deliverables.append("Qualification coupon and traceability plan")
+
+    blockers: list[str] = []
+    if not envelope_fit:
+        blockers.append("Part exceeds configured DED build envelope.")
+    if finish_tolerance_mm < 0.1:
+        blockers.append("Tolerance is tighter than a near-net DED process should promise directly.")
+    if cell_time_h > 200:
+        blockers.append("Cell time is high enough to require segmentation or fixture strategy review.")
+
+    return {
+        "score": route_fit_score,
+        "verdict": verdict,
+        "application_type": application_type,
+        "conventional_route": conventional_route,
+        "urgency": urgency,
+        "qualification_level": qualification_level,
+        "material_strategy": material_strategy,
+        "service_unit_estimate": service_unit_estimate,
+        "conventional_unit_estimate": conventional_unit_estimate,
+        "value_delta": value_delta,
+        "value_delta_pct": value_delta_pct,
+        "qualification_cost": qualification_cost,
+        "inspection_cost": inspection_cost,
+        "redesign_cost": redesign_cost,
+        "annual_quantity": float(quantity),
+        "deliverables": deliverables,
+        "blockers": blockers,
+        "signals": [
+            f"{lead_compression:.1f}% lead-time compression",
+            f"{material_saved:.1f}% material reduction versus billet assumption",
+            f"{quantity} pcs annual demand",
+            f"{qualification_level} qualification burden",
+        ],
+    }
+
+
 def build_quality_scorecard(
     *,
     readiness: dict[str, Any],
@@ -846,6 +996,10 @@ def _banded_score(value: float, *, excellent: float, good: float, review: float)
     return 45
 
 
+def _clamp_score(value: float) -> int:
+    return max(0, min(100, round(float(value))))
+
+
 def _score_status(score: int) -> str:
     if score >= 90:
         return "Excellent"
@@ -875,6 +1029,7 @@ def generate_job_dossier_markdown(
     release_checklist: list[dict[str, str]] | None = None,
     optimization_playbook: list[dict[str, Any]] | None = None,
     ded_analysis: dict[str, Any] | None = None,
+    partner_fit: dict[str, Any] | None = None,
 ) -> str:
     """Build a concise production dossier suitable for customers and managers."""
     issues = readiness.get("issues", [])
@@ -931,6 +1086,19 @@ def generate_job_dossier_markdown(
             f"- Lead-time compression: {ded_analysis.get('lead_time_compression_pct', 0.0):.1f}%",
         ]
         if ded_analysis else ["- DED process model was not enabled for this run."]
+    )
+    partner_lines = (
+        [
+            f"- Fit score: {partner_fit.get('score', 0)}/100 ({partner_fit.get('verdict', 'Review')})",
+            f"- Application: {partner_fit.get('application_type', 'Unknown')}",
+            f"- Conventional route: {partner_fit.get('conventional_route', 'Unknown')}",
+            f"- Service estimate: ${partner_fit.get('service_unit_estimate', 0.0):.2f}",
+            f"- Conventional estimate: ${partner_fit.get('conventional_unit_estimate', 0.0):.2f}",
+            f"- Value delta: ${partner_fit.get('value_delta', 0.0):.2f} "
+            f"({partner_fit.get('value_delta_pct', 0.0):+.1f}%)",
+            "- Deliverables: " + "; ".join(partner_fit.get("deliverables", [])),
+        ]
+        if partner_fit else ["- Manufacturing partner fit was not assessed for this run."]
     )
 
     return "\n".join([
@@ -998,6 +1166,9 @@ def generate_job_dossier_markdown(
         "",
         "## DED Process Model",
         *ded_lines,
+        "",
+        "## Manufacturing Partner Fit",
+        *partner_lines,
         "",
         "## Release Checklist",
         *checklist_lines,

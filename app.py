@@ -14,6 +14,7 @@ from src.exporters import segments_to_dataframe
 from src.geometry import validate_polygon
 from src.job_analysis import (
     assess_commercial_fit,
+    assess_manufacturing_partner_fit,
     build_batch_scenarios,
     build_ded_recommendations,
     build_launch_recommendations,
@@ -60,6 +61,7 @@ from ui.dashboard import (
     render_launch_ribbon,
     render_launch_optimizer,
     render_next_action,
+    render_partner_fit_panel,
     render_pattern_ranking,
     render_quality_scorecard,
     render_release_gate_matrix,
@@ -593,6 +595,20 @@ commercial_fit = assess_commercial_fit(
     target_unit_price=float(target_unit_price),
     max_lead_time_h=float(max_lead_time_h),
 )
+partner_fit = assess_manufacturing_partner_fit(
+    ded_analysis=ded_analysis,
+    economics=economics,
+    commercial_fit=commercial_fit,
+    application_type=str(application_type),
+    conventional_route=str(conventional_route),
+    urgency=str(urgency),
+    qualification_level=str(qualification_level),
+    material_strategy=str(material_strategy),
+    finish_tolerance_mm=float(finish_tolerance_mm),
+    annual_quantity=int(annual_quantity),
+    ndt_required=bool(ndt_required),
+    redesign_required=bool(redesign_required),
+) if ded_analysis is not None else None
 launch_score = compute_launch_score(
     readiness=readiness,
     risk=program_risk,
@@ -1032,6 +1048,9 @@ with tab_release:
     render_ded_process_panel(ded_analysis)
     if ded_analysis is not None:
         st.markdown("---")
+    render_partner_fit_panel(partner_fit)
+    if partner_fit is not None:
+        st.markdown("---")
 
     # Quality scorecard + Advisor side by side
     rel_left, rel_right = st.columns([3, 2])
@@ -1107,6 +1126,7 @@ with tab_release:
         "release_checklist": release_checklist,
         "optimization_playbook": optimization_playbook,
         "ded_process": ded_analysis,
+        "manufacturing_partner_fit": partner_fit,
         "ded_assumptions": {
             "profile": ded_profile,
             "wire_diameter_mm": float(ded_wire_diameter_mm),
@@ -1123,6 +1143,15 @@ with tab_release:
             "quote_profile": quote_profile,
             "batch_quantity": int(batch_quantity),
             "target_unit_price": float(target_unit_price),
+            "application_type": application_type,
+            "conventional_route": conventional_route,
+            "urgency": urgency,
+            "qualification_level": qualification_level,
+            "material_strategy": material_strategy,
+            "finish_tolerance_mm": float(finish_tolerance_mm),
+            "annual_quantity": int(annual_quantity),
+            "ndt_required": bool(ndt_required),
+            "redesign_required": bool(redesign_required),
             "machine_rate_per_h": float(machine_rate_per_h),
             "labor_rate_per_h": float(labor_rate_per_h),
             "setup_time_min": float(setup_time_min),
@@ -1196,6 +1225,7 @@ with tab_release:
         release_checklist=release_checklist,
         optimization_playbook=optimization_playbook,
         ded_analysis=ded_analysis,
+        partner_fit=partner_fit,
     )
     dossier_html = generate_job_dossier_html(dossier_md)
     render_export_panel(
