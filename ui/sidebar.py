@@ -8,6 +8,8 @@ import streamlit as st
 
 from src.profiles import QUALITY_PROFILES
 from ui.process_controls import (
+    render_business_controls,
+    render_ded_controls,
     render_placement_controls,
     render_preview_controls,
     render_print_controls,
@@ -31,7 +33,7 @@ def render_quick_setup() -> dict[str, Any]:
             "Controls", ["Basic", "Advanced"], default="Basic",
             help="Advanced unlocks fine-grained overrides.",
         )
-        process_mode = qs4.segmented_control("Process", ["FDM", "DED / Metal"], default="FDM")
+        process_mode = qs4.segmented_control("Process", ["FDM", "Metal (LPBF/DED)"], default="FDM")
         if qs5.button("Reset", help="Reset all settings to defaults", width="stretch"):
             st.session_state.clear()
             st.rerun()
@@ -51,6 +53,7 @@ def render_sidebar(
     default: dict[str, float | int],
     profile: str,
     quick_plate: str,
+    process_mode: str,
     advanced: bool,
     shapes: list[str],
     patterns: list[str],
@@ -71,6 +74,8 @@ def render_sidebar(
         )
         values.update(render_toolpath_controls(default, patterns, pattern_icons, advanced))
         values.update(render_print_controls(default, advanced, values["stl_info"]))
+        values.update(render_business_controls(advanced))
+        values.update(render_ded_controls(process_mode, advanced))
         values.update(render_placement_controls(quick_plate, advanced))
         values.update(render_preview_controls(advanced))
 

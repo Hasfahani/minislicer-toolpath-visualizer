@@ -15,17 +15,19 @@ from src.geometry import validate_polygon
 from src.job_analysis import (
     assess_commercial_fit,
     build_batch_scenarios,
+    build_ded_recommendations,
     build_launch_recommendations,
     build_optimization_playbook,
     build_quality_scorecard,
     build_release_checklist,
     classify_program_risk,
     compute_launch_score,
+    estimate_ded_process,
     estimate_job_economics,
     generate_job_dossier_html,
     generate_job_dossier_markdown,
 )
-from src.metrics import summarize_metrics
+from src.metrics import MATERIAL_DENSITY, summarize_metrics
 from src.plotting import (
     create_comparison_figure,
     create_infill_length_histogram,
@@ -53,6 +55,7 @@ from src.toolpaths import (
 from src.validation import assess_job_readiness, readiness_to_dict
 from src.workflow import apply_placement, build_shape, fmt_time, largest_polygon
 from ui.dashboard import (
+    render_ded_process_panel,
     render_executive_dashboard,
     render_launch_ribbon,
     render_launch_optimizer,
@@ -386,6 +389,7 @@ controls = render_sidebar(
     default,
     profile,
     quick_plate,
+    process_mode,
     advanced,
     SHAPES,
     PATTERNS,
@@ -529,6 +533,34 @@ economics = estimate_job_economics(
     margin_pct=float(margin_pct),
     batch_quantity=int(batch_quantity),
 )
+ded_analysis = None
+if bool(ded_enabled):
+    ded_analysis = estimate_ded_process(
+        metrics=metrics,
+        material_density_g_cm3=float(MATERIAL_DENSITY.get(material_choice, 7.99)),
+        full_weight_g=full_weight_g,
+        full_time_s=full_time_s,
+        model_height_mm=float(model_height),
+        bbox_width_mm=float(metrics["bbox_width_mm"]),
+        bbox_depth_mm=float(metrics["bbox_height_mm"]),
+        layer_height_mm=float(layer_height),
+        bead_width_mm=float(nozzle_diameter),
+        print_speed_mm_s=float(print_speed),
+        wire_diameter_mm=float(ded_wire_diameter_mm),
+        wire_feed_m_min=float(ded_wire_feed_m_min),
+        arc_current_a=float(ded_arc_current_a),
+        arc_voltage_v=float(ded_arc_voltage_v),
+        arc_efficiency_pct=float(ded_arc_efficiency_pct),
+        deposition_efficiency_pct=float(ded_deposition_efficiency_pct),
+        robot_utilization_pct=float(ded_robot_utilization_pct),
+        machining_allowance_pct=float(ded_machining_allowance_pct),
+        billet_buy_to_fly=float(ded_billet_buy_to_fly),
+        conventional_lead_time_weeks=float(ded_conventional_lead_time_weeks),
+        machine_capacity_h_week=float(ded_machine_capacity_h_week),
+        envelope_x_mm=float(ded_envelope_x_mm),
+        envelope_y_mm=float(ded_envelope_y_mm),
+        envelope_z_mm=float(ded_envelope_z_mm),
+    )
 min_x, min_y, max_x, max_y = shape.bounds
 fits_plate = not show_plate or (min_x >= 0 and min_y >= 0 and max_x <= plate_w and max_y <= plate_d)
 travel_ratio = (
@@ -595,6 +627,11 @@ launch_recommendations = build_launch_recommendations(
     layer_count=layer_count,
     recommended_pattern=str(recommended_pattern),
 )
+if ded_analysis is not None:
+    launch_recommendations = sorted(
+        [*launch_recommendations, *build_ded_recommendations(ded_analysis)],
+        key=lambda item: (-int(item["priority_score"]), str(item["area"]), str(item["title"])),
+    )
 scenario_quantities = sorted({
     1,
     int(batch_quantity),
@@ -992,6 +1029,9 @@ with tab_release:
     )
 
     st.markdown("---")
+    render_ded_process_panel(ded_analysis)
+    if ded_analysis is not None:
+        st.markdown("---")
 
     # Quality scorecard + Advisor side by side
     rel_left, rel_right = st.columns([3, 2])
@@ -1066,6 +1106,19 @@ with tab_release:
         "batch_scenarios": batch_scenarios,
         "release_checklist": release_checklist,
         "optimization_playbook": optimization_playbook,
+        "ded_process": ded_analysis,
+        "ded_assumptions": {
+            "profile": ded_profile,
+            "wire_diameter_mm": float(ded_wire_diameter_mm),
+            "wire_feed_m_min": float(ded_wire_feed_m_min),
+            "arc_current_a": float(ded_arc_current_a),
+            "arc_voltage_v": float(ded_arc_voltage_v),
+            "arc_efficiency_pct": float(ded_arc_efficiency_pct),
+            "deposition_efficiency_pct": float(ded_deposition_efficiency_pct),
+            "robot_utilization_pct": float(ded_robot_utilization_pct),
+            "machining_allowance_pct": float(ded_machining_allowance_pct),
+            "billet_buy_to_fly": float(ded_billet_buy_to_fly),
+        },
         "business_assumptions": {
             "quote_profile": quote_profile,
             "batch_quantity": int(batch_quantity),
@@ -1142,6 +1195,7 @@ with tab_release:
         batch_scenarios=batch_scenarios,
         release_checklist=release_checklist,
         optimization_playbook=optimization_playbook,
+        ded_analysis=ded_analysis,
     )
     dossier_html = generate_job_dossier_html(dossier_md)
     render_export_panel(

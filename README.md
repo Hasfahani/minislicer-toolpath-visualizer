@@ -16,10 +16,10 @@ the target machine before release.
 | Geometry | Built-in parametric shapes, custom polygons, SVG outline import, and STL cross-section slicing |
 | Toolpaths | Inward perimeters, parallel, zigzag, grid, triangular, honeycomb, and concentric infill |
 | Planning Engine | Typed toolpath settings, reusable layer planner, full-build segment generation, pattern ranking, and deterministic plan fingerprints |
-| Planning | Per-layer and full-build path estimates, acceleration-aware motion time, travel share, and material use |
-| Executive Review | Launch score, readiness score, program risk, unit/batch quote, productivity, launch optimizer, what-if playbook, batch scenarios, release checklist, quality scorecard, and cost-stack view |
+| Planning | Per-layer and full-build path estimates, acceleration-aware motion time, travel share, material use, wire-feed balance, heat input, and deposition rate |
+| Executive Review | Launch score, readiness score, program risk, unit/batch quote, productivity, DED process model, launch optimizer, what-if playbook, batch scenarios, release checklist, quality scorecard, and cost-stack view |
 | Quality Gates | Plate fit, missing paths, tall layer height, sparse infill, high travel, heavy path count, tall builds, and volumetric flow |
-| Commercial Controls | Customer/job metadata, batch quantity, target price, machine rate, labor rate, setup time, postprocess time, scrap, margin, and lead-time guardrails |
+| Commercial Controls | Customer/job metadata, batch quantity, target price, machine rate, labor rate, setup time, postprocess time, scrap, margin, conventional lead time, and machine-capacity guardrails |
 | Visualization | Toolpath, extrusion-width, speed map, time map, density map, animation, and 3D layer stack views |
 | Export | CSV, JSON, SVG, preview G-code, guarded FDM production G-code, markdown dossier, HTML dossier, and text report |
 | Reproducibility | JSON parameter snapshots can be re-imported to recreate prior planning runs |
@@ -66,9 +66,11 @@ streamlit run app.py
 4. Set job metadata, batch quantity, quote assumptions, target price, and
    machine-time guardrails in Business / Launch.
 5. Review the Executive, Quality, and Advisor tabs before exporting.
-6. Use the Launch Optimizer to review top moves, what-if levers, batch scenarios, and release checklist status.
-7. Export a dossier for sign-off, plus data files for engineering traceability.
-8. Use production G-code only when readiness is unblocked, process mode is FDM,
+6. In Metal mode, review the DED process model for envelope fit, wire demand,
+   heat input, energy, material savings, and lead-time compression.
+7. Use the Launch Optimizer to review top moves, what-if levers, batch scenarios, and release checklist status.
+8. Export a dossier for sign-off, plus data files for engineering traceability.
+9. Use production G-code only when readiness is unblocked, process mode is FDM,
    and the selected machine profile matches the physical printer.
 
 ## Engineering Model
@@ -85,6 +87,12 @@ defines validated immutable inputs, `plan_layer` returns a complete layer plan,
 layer limit, and `rank_infill_patterns` scores candidates for operator review.
 Every planning package receives a deterministic fingerprint based on geometry,
 toolpath settings, process, material, and layer count.
+
+Metal planning mode adds a neutral wire-arc DED process model. It estimates wire
+mass flow from wire diameter and feed rate, deposited kg/h from deposition
+efficiency, heat input from arc voltage/current and travel speed, energy per kg,
+near-net machining allowance, feedstock required, material saved versus billet
+buy-to-fly, build-envelope utilization, and additive lead-time compression.
 
 The quote model is transparent by design. Setup labor is amortized across the
 batch, while machine time, material, and postprocess labor remain per-part

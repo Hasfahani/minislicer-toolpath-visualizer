@@ -576,6 +576,199 @@ def build_optimization_playbook(
     return sorted(rows, key=lambda row: -int(row["impact_score"]))
 
 
+def estimate_ded_process(
+    *,
+    metrics: dict[str, Any],
+    material_density_g_cm3: float,
+    full_weight_g: float,
+    full_time_s: float,
+    model_height_mm: float,
+    bbox_width_mm: float,
+    bbox_depth_mm: float,
+    layer_height_mm: float,
+    bead_width_mm: float,
+    print_speed_mm_s: float,
+    wire_diameter_mm: float,
+    wire_feed_m_min: float,
+    arc_current_a: float,
+    arc_voltage_v: float,
+    arc_efficiency_pct: float,
+    deposition_efficiency_pct: float,
+    robot_utilization_pct: float,
+    machining_allowance_pct: float,
+    billet_buy_to_fly: float,
+    conventional_lead_time_weeks: float,
+    machine_capacity_h_week: float,
+    envelope_x_mm: float,
+    envelope_y_mm: float,
+    envelope_z_mm: float,
+) -> dict[str, Any]:
+    """Estimate wire-arc DED process, energy, feedstock, and lead-time KPIs."""
+    density = max(float(material_density_g_cm3), 0.001)
+    net_mass_kg = max(float(full_weight_g), 0.0) / 1000.0
+    deposition_eff = max(float(deposition_efficiency_pct), 0.1) / 100.0
+    arc_eff = max(float(arc_efficiency_pct), 0.0) / 100.0
+    utilization = max(float(robot_utilization_pct), 0.1) / 100.0
+    allowance_multiplier = 1.0 + max(float(machining_allowance_pct), 0.0) / 100.0
+    near_net_mass_kg = net_mass_kg * allowance_multiplier
+
+    wire_area_mm2 = math.pi * (max(float(wire_diameter_mm), 0.001) / 2.0) ** 2
+    wire_feed_mm_s = max(float(wire_feed_m_min), 0.0) * 1000.0 / 60.0
+    wire_volume_mm3_s = wire_area_mm2 * wire_feed_mm_s
+    wire_mass_kg_h = wire_volume_mm3_s * density * 0.0036
+    deposited_kg_h = wire_mass_kg_h * deposition_eff
+
+    deposition_time_h = near_net_mass_kg / deposited_kg_h if deposited_kg_h > 0 else math.inf
+    toolpath_time_h = max(float(full_time_s), 0.0) / 3600.0
+    cell_time_h = max(deposition_time_h, toolpath_time_h) / utilization
+    deposited_mass_kg = near_net_mass_kg
+    wire_required_kg = deposited_mass_kg / deposition_eff if deposition_eff > 0 else math.inf
+
+    arc_power_kw = max(float(arc_current_a), 0.0) * max(float(arc_voltage_v), 0.0) / 1000.0
+    effective_arc_power_kw = arc_power_kw * arc_eff
+    arc_energy_kwh = arc_power_kw * deposition_time_h if math.isfinite(deposition_time_h) else math.inf
+    specific_energy_kwh_kg = arc_energy_kwh / deposited_mass_kg if deposited_mass_kg > 0 else 0.0
+    heat_input_kj_mm = (
+        max(float(arc_current_a), 0.0)
+        * max(float(arc_voltage_v), 0.0)
+        * arc_eff
+        / (max(float(print_speed_mm_s), 0.001) * 1000.0)
+    )
+
+    bead_area_mm2 = (math.pi / 4.0) * max(float(layer_height_mm), 0.0) * max(float(bead_width_mm), 0.0)
+    path_deposition_kg_h = max(float(print_speed_mm_s), 0.0) * bead_area_mm2 * density * 0.0036
+    required_wire_feed_m_min = (
+        (path_deposition_kg_h / deposition_eff)
+        / (wire_area_mm2 * density * 0.0036)
+        * 60.0
+        / 1000.0
+        if wire_area_mm2 > 0 and deposition_eff > 0 else math.inf
+    )
+    feed_supply_ratio = (
+        wire_feed_m_min / required_wire_feed_m_min
+        if required_wire_feed_m_min and math.isfinite(required_wire_feed_m_min) else math.inf
+    )
+
+    billet_mass_kg = net_mass_kg * max(float(billet_buy_to_fly), 1.0)
+    material_saved_kg = max(0.0, billet_mass_kg - wire_required_kg)
+    material_saved_pct = 100.0 * material_saved_kg / billet_mass_kg if billet_mass_kg > 0 else 0.0
+
+    additive_lead_weeks = cell_time_h / max(float(machine_capacity_h_week), 0.001)
+    lead_time_saved_weeks = max(0.0, float(conventional_lead_time_weeks) - additive_lead_weeks)
+    lead_time_compression_pct = (
+        100.0 * lead_time_saved_weeks / float(conventional_lead_time_weeks)
+        if conventional_lead_time_weeks > 0 else 0.0
+    )
+
+    envelope_fit = (
+        max(float(bbox_width_mm), 0.0) <= max(float(envelope_x_mm), 0.0)
+        and max(float(bbox_depth_mm), 0.0) <= max(float(envelope_y_mm), 0.0)
+        and max(float(model_height_mm), 0.0) <= max(float(envelope_z_mm), 0.0)
+    )
+    z_utilization_pct = 100.0 * max(float(model_height_mm), 0.0) / max(float(envelope_z_mm), 0.001)
+    footprint_utilization_pct = 100.0 * max(float(bbox_width_mm), 0.0) * max(float(bbox_depth_mm), 0.0) / max(
+        float(envelope_x_mm) * float(envelope_y_mm),
+        0.001,
+    )
+
+    return {
+        "enabled": True,
+        "net_mass_kg": net_mass_kg,
+        "near_net_mass_kg": near_net_mass_kg,
+        "wire_required_kg": wire_required_kg,
+        "wire_mass_kg_h": wire_mass_kg_h,
+        "deposited_kg_h": deposited_kg_h,
+        "deposition_time_h": deposition_time_h,
+        "toolpath_time_h": toolpath_time_h,
+        "cell_time_h": cell_time_h,
+        "arc_power_kw": arc_power_kw,
+        "effective_arc_power_kw": effective_arc_power_kw,
+        "arc_energy_kwh": arc_energy_kwh,
+        "specific_energy_kwh_kg": specific_energy_kwh_kg,
+        "heat_input_kj_mm": heat_input_kj_mm,
+        "bead_area_mm2": bead_area_mm2,
+        "path_deposition_kg_h": path_deposition_kg_h,
+        "required_wire_feed_m_min": required_wire_feed_m_min,
+        "feed_supply_ratio": feed_supply_ratio,
+        "billet_mass_kg": billet_mass_kg,
+        "material_saved_kg": material_saved_kg,
+        "material_saved_pct": material_saved_pct,
+        "additive_lead_weeks": additive_lead_weeks,
+        "lead_time_saved_weeks": lead_time_saved_weeks,
+        "lead_time_compression_pct": lead_time_compression_pct,
+        "envelope_fit": envelope_fit,
+        "z_utilization_pct": z_utilization_pct,
+        "footprint_utilization_pct": footprint_utilization_pct,
+        "bbox_width_mm": float(bbox_width_mm),
+        "bbox_depth_mm": float(bbox_depth_mm),
+        "model_height_mm": float(model_height_mm),
+        "envelope_x_mm": float(envelope_x_mm),
+        "envelope_y_mm": float(envelope_y_mm),
+        "envelope_z_mm": float(envelope_z_mm),
+        "material_volume_cm3": max(float(metrics.get("material_volume_mm3", 0.0)), 0.0) / 1000.0,
+    }
+
+
+def build_ded_recommendations(ded: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return launch recommendations from the DED process model."""
+    recommendations: list[dict[str, Any]] = []
+
+    def add(priority: str, title: str, action: str, impact: str) -> None:
+        recommendations.append({
+            "priority": priority,
+            "priority_score": PRIORITY_RANK.get(priority, 0),
+            "area": "DED process",
+            "title": title,
+            "action": action,
+            "impact": impact,
+            "owner": "Process",
+        })
+
+    if not ded.get("envelope_fit", False):
+        add(
+            "Critical",
+            "DED envelope overflow",
+            "Reduce scale, change orientation, segment the part, or select a larger cell.",
+            "The current bounding box exceeds the configured DED build envelope.",
+        )
+
+    if float(ded.get("feed_supply_ratio", 1.0)) < 0.9:
+        add(
+            "High",
+            "Wire feed cannot support selected bead speed",
+            "Lower travel speed, reduce bead area, or increase validated wire feed.",
+            (
+                f"Configured feed supplies {float(ded.get('feed_supply_ratio', 0.0)):.2f}x "
+                "of the estimated wire demand."
+            ),
+        )
+
+    if float(ded.get("heat_input_kj_mm", 0.0)) > 1.2:
+        add(
+            "High",
+            "High heat input",
+            "Reduce current/voltage, increase travel speed, or add interpass controls.",
+            f"Estimated heat input is {float(ded.get('heat_input_kj_mm', 0.0)):.2f} kJ/mm.",
+        )
+    elif float(ded.get("heat_input_kj_mm", 0.0)) < 0.15:
+        add(
+            "Medium",
+            "Low heat input",
+            "Confirm fusion quality with coupons before quoting the build.",
+            f"Estimated heat input is {float(ded.get('heat_input_kj_mm', 0.0)):.2f} kJ/mm.",
+        )
+
+    if float(ded.get("z_utilization_pct", 0.0)) > 90:
+        add(
+            "Medium",
+            "Build height near cell limit",
+            "Review torch clearance, fixturing, and robot reach before release.",
+            f"Z utilization is {float(ded.get('z_utilization_pct', 0.0)):.1f}%.",
+        )
+
+    return recommendations
+
+
 def build_quality_scorecard(
     *,
     readiness: dict[str, Any],
@@ -681,6 +874,7 @@ def generate_job_dossier_markdown(
     batch_scenarios: list[dict[str, Any]] | None = None,
     release_checklist: list[dict[str, str]] | None = None,
     optimization_playbook: list[dict[str, Any]] | None = None,
+    ded_analysis: dict[str, Any] | None = None,
 ) -> str:
     """Build a concise production dossier suitable for customers and managers."""
     issues = readiness.get("issues", [])
@@ -723,6 +917,21 @@ def generate_job_dossier_markdown(
         )
         for row in (optimization_playbook or [])
     ] or ["- Optimization playbook was not generated."]
+    ded_lines = (
+        [
+            f"- Envelope fit: {'Yes' if ded_analysis.get('envelope_fit') else 'No'}",
+            f"- Deposition rate: {ded_analysis.get('deposited_kg_h', 0.0):.2f} kg/h",
+            f"- Required wire feed: {ded_analysis.get('required_wire_feed_m_min', 0.0):.2f} m/min",
+            f"- Heat input: {ded_analysis.get('heat_input_kj_mm', 0.0):.2f} kJ/mm",
+            f"- Arc energy: {ded_analysis.get('arc_energy_kwh', 0.0):.2f} kWh",
+            f"- Wire required: {ded_analysis.get('wire_required_kg', 0.0):.2f} kg",
+            f"- Material saved vs billet: {ded_analysis.get('material_saved_kg', 0.0):.2f} kg "
+            f"({ded_analysis.get('material_saved_pct', 0.0):.1f}%)",
+            f"- Additive lead time: {ded_analysis.get('additive_lead_weeks', 0.0):.2f} weeks",
+            f"- Lead-time compression: {ded_analysis.get('lead_time_compression_pct', 0.0):.1f}%",
+        ]
+        if ded_analysis else ["- DED process model was not enabled for this run."]
+    )
 
     return "\n".join([
         f"# MiniSlicer Job Dossier: {job_name}",
@@ -786,6 +995,9 @@ def generate_job_dossier_markdown(
         "",
         "## What-If Playbook",
         *playbook_lines,
+        "",
+        "## DED Process Model",
+        *ded_lines,
         "",
         "## Release Checklist",
         *checklist_lines,

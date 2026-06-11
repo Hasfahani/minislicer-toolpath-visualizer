@@ -403,6 +403,52 @@ def render_launch_optimizer(
         st.dataframe(scenario_rows, hide_index=True, width="stretch")
 
 
+def render_ded_process_panel(ded: dict[str, Any] | None) -> None:
+    """Render a neutral DED / wire-arc process engineering panel."""
+    if not ded:
+        return
+
+    st.markdown("### DED Process Model")
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("Deposition rate", f"{float(ded['deposited_kg_h']):.2f} kg/h")
+    k2.metric("Wire feed demand", f"{float(ded['required_wire_feed_m_min']):.2f} m/min")
+    k3.metric("Heat input", f"{float(ded['heat_input_kj_mm']):.2f} kJ/mm")
+    k4.metric("Material saved", f"{float(ded['material_saved_pct']):.1f}%")
+    k5.metric("Lead compression", f"{float(ded['lead_time_compression_pct']):.1f}%")
+
+    left, right = st.columns(2)
+    with left:
+        st.markdown("#### Mass and Energy")
+        st.dataframe(
+            [
+                {"metric": "Net mass", "value": f"{float(ded['net_mass_kg']):.2f} kg"},
+                {"metric": "Near-net deposited mass", "value": f"{float(ded['near_net_mass_kg']):.2f} kg"},
+                {"metric": "Wire required", "value": f"{float(ded['wire_required_kg']):.2f} kg"},
+                {"metric": "Arc power", "value": f"{float(ded['arc_power_kw']):.2f} kW"},
+                {"metric": "Effective arc power", "value": f"{float(ded['effective_arc_power_kw']):.2f} kW"},
+                {"metric": "Arc energy", "value": f"{float(ded['arc_energy_kwh']):.2f} kWh"},
+                {"metric": "Specific energy", "value": f"{float(ded['specific_energy_kwh_kg']):.2f} kWh/kg"},
+            ],
+            hide_index=True,
+            width="stretch",
+        )
+    with right:
+        st.markdown("#### Envelope and Schedule")
+        st.dataframe(
+            [
+                {"metric": "Envelope fit", "value": "Yes" if ded["envelope_fit"] else "No"},
+                {"metric": "Footprint utilization", "value": f"{float(ded['footprint_utilization_pct']):.1f}%"},
+                {"metric": "Z utilization", "value": f"{float(ded['z_utilization_pct']):.1f}%"},
+                {"metric": "Cell time", "value": f"{float(ded['cell_time_h']):.2f} h"},
+                {"metric": "Additive lead time", "value": f"{float(ded['additive_lead_weeks']):.2f} weeks"},
+                {"metric": "Lead time saved", "value": f"{float(ded['lead_time_saved_weeks']):.2f} weeks"},
+                {"metric": "Feed supply ratio", "value": f"{float(ded['feed_supply_ratio']):.2f}x"},
+            ],
+            hide_index=True,
+            width="stretch",
+        )
+
+
 def render_next_action(
     *,
     readiness: dict[str, Any],

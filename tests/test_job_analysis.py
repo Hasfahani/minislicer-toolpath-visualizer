@@ -3,12 +3,14 @@
 from src.job_analysis import (
     assess_commercial_fit,
     build_batch_scenarios,
+    build_ded_recommendations,
     build_launch_recommendations,
     build_optimization_playbook,
     build_quality_scorecard,
     build_release_checklist,
     classify_program_risk,
     compute_launch_score,
+    estimate_ded_process,
     estimate_job_economics,
     generate_job_dossier_html,
     generate_job_dossier_markdown,
@@ -371,6 +373,76 @@ def test_optimization_playbook_flags_high_flow_reduction() -> None:
     assert "under the high-risk warning band" in flow["estimated_delta"]
 
 
+def test_ded_process_estimates_wire_feed_energy_and_lead_time() -> None:
+    ded = estimate_ded_process(
+        metrics={"material_volume_mm3": 250_000.0},
+        material_density_g_cm3=7.99,
+        full_weight_g=2200.0,
+        full_time_s=7200.0,
+        model_height_mm=300.0,
+        bbox_width_mm=220.0,
+        bbox_depth_mm=180.0,
+        layer_height_mm=1.2,
+        bead_width_mm=4.0,
+        print_speed_mm_s=8.0,
+        wire_diameter_mm=1.2,
+        wire_feed_m_min=6.0,
+        arc_current_a=180.0,
+        arc_voltage_v=24.0,
+        arc_efficiency_pct=80.0,
+        deposition_efficiency_pct=88.0,
+        robot_utilization_pct=72.0,
+        machining_allowance_pct=12.0,
+        billet_buy_to_fly=3.5,
+        conventional_lead_time_weeks=20.0,
+        machine_capacity_h_week=80.0,
+        envelope_x_mm=500.0,
+        envelope_y_mm=500.0,
+        envelope_z_mm=1500.0,
+    )
+
+    assert ded["envelope_fit"] is True
+    assert ded["wire_mass_kg_h"] > ded["deposited_kg_h"]
+    assert ded["deposited_kg_h"] > 2.0
+    assert ded["heat_input_kj_mm"] > 0
+    assert ded["material_saved_pct"] > 50
+    assert ded["lead_time_compression_pct"] > 90
+
+
+def test_ded_recommendations_flag_envelope_feed_and_heat_risks() -> None:
+    ded = estimate_ded_process(
+        metrics={"material_volume_mm3": 100_000.0},
+        material_density_g_cm3=7.99,
+        full_weight_g=1000.0,
+        full_time_s=3600.0,
+        model_height_mm=1600.0,
+        bbox_width_mm=600.0,
+        bbox_depth_mm=450.0,
+        layer_height_mm=2.0,
+        bead_width_mm=8.0,
+        print_speed_mm_s=5.0,
+        wire_diameter_mm=1.0,
+        wire_feed_m_min=1.0,
+        arc_current_a=420.0,
+        arc_voltage_v=34.0,
+        arc_efficiency_pct=85.0,
+        deposition_efficiency_pct=80.0,
+        robot_utilization_pct=60.0,
+        machining_allowance_pct=20.0,
+        billet_buy_to_fly=4.0,
+        conventional_lead_time_weeks=12.0,
+        machine_capacity_h_week=60.0,
+        envelope_x_mm=500.0,
+        envelope_y_mm=500.0,
+        envelope_z_mm=1500.0,
+    )
+    recommendations = build_ded_recommendations(ded)
+
+    assert any(row["title"] == "DED envelope overflow" for row in recommendations)
+    assert any("Wire feed" in row["title"] for row in recommendations)
+    assert any(row["title"] == "High heat input" for row in recommendations)
+
+
 def test_dossier_contains_traceable_summary() -> None:
     economics = estimate_job_economics(
         metrics=_metrics(),
@@ -443,6 +515,18 @@ def test_dossier_contains_traceable_summary() -> None:
                 "confidence": "High",
             }
         ],
+        ded_analysis={
+            "envelope_fit": True,
+            "deposited_kg_h": 2.5,
+            "required_wire_feed_m_min": 5.4,
+            "heat_input_kj_mm": 0.6,
+            "arc_energy_kwh": 4.2,
+            "wire_required_kg": 1.3,
+            "material_saved_kg": 3.1,
+            "material_saved_pct": 70.0,
+            "additive_lead_weeks": 0.2,
+            "lead_time_compression_pct": 95.0,
+        },
     )
     html = generate_job_dossier_html(dossier)
 
@@ -454,5 +538,6 @@ def test_dossier_contains_traceable_summary() -> None:
     assert "Launch Optimizer" in dossier
     assert "Batch Scenarios" in dossier
     assert "What-If Playbook" in dossier
+    assert "DED Process Model" in dossier
     assert "Release Checklist" in dossier
     assert "<!doctype html>" in html
