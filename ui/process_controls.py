@@ -257,6 +257,15 @@ def render_ded_controls(process_mode: str, advanced: bool) -> dict[str, Any]:
     ded_billet_buy_to_fly = 3.5
     ded_conventional_lead_time_weeks = 20.0
     ded_machine_capacity_h_week = 80.0
+    ded_preheat_temp_c = 80.0
+    ded_interpass_limit_c = 250.0
+    ded_cooling_rate_c_min = 12.0
+    ded_heat_retention_pct = 22.0
+    ded_robot_reach_mm = 1800.0
+    ded_positioner_payload_kg = 500.0
+    ded_fixture_mass_kg = 75.0
+    ded_torch_clearance_mm = 120.0
+    ded_program_point_limit = 25000
 
     if not ded_enabled:
         return locals()
@@ -334,6 +343,22 @@ def render_ded_controls(process_mode: str, advanced: bool) -> dict[str, Any]:
             )
             ded_machine_capacity_h_week = st.number_input(
                 "Available machine hours / week", 1.0, value=80.0, step=5.0,
+            )
+            st.markdown("**Thermal and Robot Handoff**")
+            th1, th2 = st.columns(2)
+            ded_preheat_temp_c = th1.number_input("Preheat temp (C)", 0.0, value=80.0, step=10.0)
+            ded_interpass_limit_c = th2.number_input("Interpass limit (C)", 1.0, value=250.0, step=10.0)
+            th3, th4 = st.columns(2)
+            ded_cooling_rate_c_min = th3.number_input("Cooling rate (C/min)", 0.1, value=12.0, step=1.0)
+            ded_heat_retention_pct = th4.number_input("Heat retention (%)", 0.0, 100.0, 22.0, 1.0)
+            rb1, rb2 = st.columns(2)
+            ded_robot_reach_mm = rb1.number_input("Robot reach (mm)", 100.0, value=1800.0, step=100.0)
+            ded_positioner_payload_kg = rb2.number_input("Positioner payload (kg)", 1.0, value=500.0, step=25.0)
+            rb3, rb4 = st.columns(2)
+            ded_fixture_mass_kg = rb3.number_input("Fixture mass (kg)", 0.0, value=75.0, step=5.0)
+            ded_torch_clearance_mm = rb4.number_input("Torch clearance (mm)", 0.0, value=120.0, step=10.0)
+            ded_program_point_limit = st.number_input(
+                "Robot program point limit", min_value=1000, value=25000, step=1000,
             )
 
     return locals()

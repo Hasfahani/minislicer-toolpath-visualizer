@@ -16,9 +16,9 @@ the target machine before release.
 | Geometry | Built-in parametric shapes, custom polygons, SVG outline import, and STL cross-section slicing |
 | Toolpaths | Inward perimeters, parallel, zigzag, grid, triangular, honeycomb, and concentric infill |
 | Planning Engine | Typed toolpath settings, reusable layer planner, full-build segment generation, pattern ranking, and deterministic plan fingerprints |
-| Planning | Per-layer and full-build path estimates, acceleration-aware motion time, travel share, material use, wire-feed balance, heat input, and deposition rate |
-| Executive Review | Launch score, readiness score, program risk, unit/batch quote, productivity, DED process model, manufacturing partner fit, launch optimizer, what-if playbook, batch scenarios, release checklist, quality scorecard, and cost-stack view |
-| Quality Gates | Plate fit, missing paths, tall layer height, sparse infill, high travel, heavy path count, tall builds, and volumetric flow |
+| Planning | Per-layer and full-build path estimates, acceleration-aware motion time, travel share, material use, wire-feed balance, heat input, interpass dwell, robot-cell feasibility, and deposition rate |
+| Executive Review | Launch score, readiness score, program risk, unit/batch quote, productivity, DED process model, manufacturing partner fit, production handoff, launch optimizer, what-if playbook, batch scenarios, release checklist, quality scorecard, and cost-stack view |
+| Quality Gates | Plate fit, missing paths, tall layer height, sparse infill, high travel, heavy path count, tall builds, volumetric flow, interpass control, robot reach/payload, and qualification evidence |
 | Commercial Controls | Customer/job metadata, application type, conventional route, urgency, qualification level, material strategy, batch quantity, target price, machine rate, labor rate, setup time, postprocess time, scrap, margin, conventional lead time, and machine-capacity guardrails |
 | Visualization | Toolpath, extrusion-width, speed map, time map, density map, animation, and 3D layer stack views |
 | Export | CSV, JSON, SVG, preview G-code, guarded FDM production G-code, markdown dossier, HTML dossier, and text report |
@@ -70,9 +70,11 @@ streamlit run app.py
    heat input, energy, material savings, and lead-time compression.
 7. Review Manufacturing Partner Fit for DfAM suitability, route comparison,
    qualification burden, service deliverables, and value versus conventional sourcing.
-8. Use the Launch Optimizer to review top moves, what-if levers, batch scenarios, and release checklist status.
-9. Export a dossier for sign-off, plus data files for engineering traceability.
-10. Use production G-code only when readiness is unblocked, process mode is FDM,
+8. Review Production Handoff for thermal/interpass controls, robot reach and
+   payload feasibility, program size, coupons, inspections, and traceability records.
+9. Use the Launch Optimizer to review top moves, what-if levers, batch scenarios, and release checklist status.
+10. Export a dossier for sign-off, plus data files for engineering traceability.
+11. Use production G-code only when readiness is unblocked, process mode is FDM,
    and the selected machine profile matches the physical printer.
 
 ## Engineering Model
@@ -101,6 +103,14 @@ candidate for a large-format metal AM service workflow. It combines lead-time
 compression, material reduction, conventional route, urgency, annual quantity,
 qualification burden, tolerances, inspection needs, and redesign effort into a
 fit verdict with expected deliverables for customer collaboration.
+
+The production handoff model adds three release-review views: thermal/interpass
+planning, robot-cell feasibility, and qualification evidence. Thermal planning
+uses arc energy, heat retention, part heat capacity, cooling rate, preheat, and
+interpass limit assumptions to estimate dwell. Robot-cell feasibility checks
+reach, payload, fixture mass, torch clearance, and program size. Qualification
+planning converts the application risk into coupon counts, inspection steps, and
+traceability records.
 
 The quote model is transparent by design. Setup labor is amortized across the
 batch, while machine time, material, and postprocess labor remain per-part

@@ -19,11 +19,15 @@ from src.job_analysis import (
     build_ded_recommendations,
     build_launch_recommendations,
     build_optimization_playbook,
+    build_production_handoff_recommendations,
+    build_qualification_plan,
     build_quality_scorecard,
     build_release_checklist,
     classify_program_risk,
     compute_launch_score,
     estimate_ded_process,
+    estimate_robot_cell_handoff,
+    estimate_thermal_management,
     estimate_job_economics,
     generate_job_dossier_html,
     generate_job_dossier_markdown,
@@ -63,6 +67,7 @@ from ui.dashboard import (
     render_next_action,
     render_partner_fit_panel,
     render_pattern_ranking,
+    render_production_handoff_panel,
     render_quality_scorecard,
     render_release_gate_matrix,
 )
@@ -609,6 +614,36 @@ partner_fit = assess_manufacturing_partner_fit(
     ndt_required=bool(ndt_required),
     redesign_required=bool(redesign_required),
 ) if ded_analysis is not None else None
+thermal_plan = None
+robot_handoff = None
+qualification_plan = None
+if ded_analysis is not None:
+    thermal_plan = estimate_thermal_management(
+        ded_analysis=ded_analysis,
+        layer_count=layer_count,
+        preheat_temp_c=float(ded_preheat_temp_c),
+        interpass_limit_c=float(ded_interpass_limit_c),
+        cooling_rate_c_min=float(ded_cooling_rate_c_min),
+        heat_retention_pct=float(ded_heat_retention_pct),
+    )
+    robot_handoff = estimate_robot_cell_handoff(
+        ded_analysis=ded_analysis,
+        production_segment_count=len(production_segments),
+        robot_reach_mm=float(ded_robot_reach_mm),
+        positioner_payload_kg=float(ded_positioner_payload_kg),
+        fixture_mass_kg=float(ded_fixture_mass_kg),
+        torch_clearance_mm=float(ded_torch_clearance_mm),
+        program_point_limit=int(ded_program_point_limit),
+    )
+    qualification_plan = build_qualification_plan(
+        partner_fit=partner_fit,
+        thermal_plan=thermal_plan,
+        robot_handoff=robot_handoff,
+        qualification_level=str(qualification_level),
+        material_strategy=str(material_strategy),
+        ndt_required=bool(ndt_required),
+        finish_tolerance_mm=float(finish_tolerance_mm),
+    )
 launch_score = compute_launch_score(
     readiness=readiness,
     risk=program_risk,
@@ -645,7 +680,15 @@ launch_recommendations = build_launch_recommendations(
 )
 if ded_analysis is not None:
     launch_recommendations = sorted(
-        [*launch_recommendations, *build_ded_recommendations(ded_analysis)],
+        [
+            *launch_recommendations,
+            *build_ded_recommendations(ded_analysis),
+            *build_production_handoff_recommendations(
+                thermal_plan=thermal_plan,
+                robot_handoff=robot_handoff,
+                qualification_plan=qualification_plan,
+            ),
+        ],
         key=lambda item: (-int(item["priority_score"]), str(item["area"]), str(item["title"])),
     )
 scenario_quantities = sorted({
@@ -1051,6 +1094,9 @@ with tab_release:
     render_partner_fit_panel(partner_fit)
     if partner_fit is not None:
         st.markdown("---")
+    render_production_handoff_panel(thermal_plan, robot_handoff, qualification_plan)
+    if qualification_plan is not None:
+        st.markdown("---")
 
     # Quality scorecard + Advisor side by side
     rel_left, rel_right = st.columns([3, 2])
@@ -1127,6 +1173,9 @@ with tab_release:
         "optimization_playbook": optimization_playbook,
         "ded_process": ded_analysis,
         "manufacturing_partner_fit": partner_fit,
+        "thermal_plan": thermal_plan,
+        "robot_handoff": robot_handoff,
+        "qualification_plan": qualification_plan,
         "ded_assumptions": {
             "profile": ded_profile,
             "wire_diameter_mm": float(ded_wire_diameter_mm),
@@ -1138,6 +1187,15 @@ with tab_release:
             "robot_utilization_pct": float(ded_robot_utilization_pct),
             "machining_allowance_pct": float(ded_machining_allowance_pct),
             "billet_buy_to_fly": float(ded_billet_buy_to_fly),
+            "preheat_temp_c": float(ded_preheat_temp_c),
+            "interpass_limit_c": float(ded_interpass_limit_c),
+            "cooling_rate_c_min": float(ded_cooling_rate_c_min),
+            "heat_retention_pct": float(ded_heat_retention_pct),
+            "robot_reach_mm": float(ded_robot_reach_mm),
+            "positioner_payload_kg": float(ded_positioner_payload_kg),
+            "fixture_mass_kg": float(ded_fixture_mass_kg),
+            "torch_clearance_mm": float(ded_torch_clearance_mm),
+            "program_point_limit": int(ded_program_point_limit),
         },
         "business_assumptions": {
             "quote_profile": quote_profile,
@@ -1226,6 +1284,9 @@ with tab_release:
         optimization_playbook=optimization_playbook,
         ded_analysis=ded_analysis,
         partner_fit=partner_fit,
+        thermal_plan=thermal_plan,
+        robot_handoff=robot_handoff,
+        qualification_plan=qualification_plan,
     )
     dossier_html = generate_job_dossier_html(dossier_md)
     render_export_panel(

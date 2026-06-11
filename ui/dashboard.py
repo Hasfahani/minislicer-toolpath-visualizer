@@ -494,6 +494,79 @@ def render_partner_fit_panel(fit: dict[str, Any] | None) -> None:
         )
 
 
+def render_production_handoff_panel(
+    thermal_plan: dict[str, Any] | None,
+    robot_handoff: dict[str, Any] | None,
+    qualification_plan: dict[str, Any] | None,
+) -> None:
+    """Render thermal, robot-cell, and qualification handoff readiness."""
+    if not any([thermal_plan, robot_handoff, qualification_plan]):
+        return
+
+    st.markdown("### Production Handoff")
+    h1, h2, h3 = st.columns(3)
+    if thermal_plan:
+        h1.metric("Thermal", thermal_plan["status"], f"{int(thermal_plan['score'])}/100")
+    if robot_handoff:
+        h2.metric("Robot cell", robot_handoff["status"], f"{int(robot_handoff['score'])}/100")
+    if qualification_plan:
+        h3.metric("Qualification", qualification_plan["status"], f"{int(qualification_plan['score'])}/100")
+
+    left, middle, right = st.columns(3)
+    with left:
+        if thermal_plan:
+            st.markdown("#### Thermal / Interpass")
+            st.dataframe(
+                [
+                    {"metric": "Estimated interpass", "value": f"{float(thermal_plan['estimated_interpass_c']):.1f} C"},
+                    {"metric": "Interpass limit", "value": f"{float(thermal_plan['interpass_limit_c']):.1f} C"},
+                    {"metric": "Dwell per layer", "value": f"{float(thermal_plan['dwell_min_per_layer']):.1f} min"},
+                    {"metric": "Total dwell", "value": f"{float(thermal_plan['total_dwell_h']):.2f} h"},
+                    {"metric": "Energy per layer", "value": f"{float(thermal_plan['energy_kj_per_layer']):.1f} kJ"},
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+    with middle:
+        if robot_handoff:
+            st.markdown("#### Robot Cell")
+            st.dataframe(
+                [
+                    {"metric": "Reach required", "value": f"{float(robot_handoff['reach_required_mm']):.0f} mm"},
+                    {"metric": "Reach utilization", "value": f"{float(robot_handoff['reach_utilization_pct']):.1f}%"},
+                    {"metric": "Payload required", "value": f"{float(robot_handoff['payload_required_kg']):.1f} kg"},
+                    {"metric": "Payload utilization", "value": f"{float(robot_handoff['payload_utilization_pct']):.1f}%"},
+                    {"metric": "Program points", "value": f"{int(robot_handoff['program_points']):,}"},
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+    with right:
+        if qualification_plan:
+            st.markdown("#### Qualification Package")
+            st.dataframe(
+                [
+                    {"metric": "Coupon count", "value": int(qualification_plan["coupon_count"])},
+                    {"metric": "Inspection steps", "value": len(qualification_plan["inspection_steps"])},
+                    {"metric": "Traceability records", "value": len(qualification_plan["records"])},
+                    {"metric": "Open risks", "value": len(qualification_plan["risks"])},
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+            with st.expander("Inspection and records", expanded=False):
+                st.dataframe(
+                    [{"inspection": item} for item in qualification_plan["inspection_steps"]],
+                    hide_index=True,
+                    width="stretch",
+                )
+                st.dataframe(
+                    [{"record": item} for item in qualification_plan["records"]],
+                    hide_index=True,
+                    width="stretch",
+                )
+
+
 def render_next_action(
     *,
     readiness: dict[str, Any],

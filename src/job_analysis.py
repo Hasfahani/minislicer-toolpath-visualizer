@@ -919,6 +919,252 @@ def assess_manufacturing_partner_fit(
     }
 
 
+def estimate_thermal_management(
+    *,
+    ded_analysis: dict[str, Any],
+    layer_count: int,
+    preheat_temp_c: float,
+    interpass_limit_c: float,
+    cooling_rate_c_min: float,
+    heat_retention_pct: float,
+    specific_heat_j_kg_c: float = 500.0,
+) -> dict[str, Any]:
+    """Estimate interpass temperature risk and dwell time for a DED build."""
+    layers = max(int(layer_count), 1)
+    mass_kg = max(float(ded_analysis.get("near_net_mass_kg", 0.0)), 0.001)
+    heat_capacity_kj_c = mass_kg * max(float(specific_heat_j_kg_c), 1.0) / 1000.0
+    energy_kj_per_layer = max(float(ded_analysis.get("arc_energy_kwh", 0.0)), 0.0) * 3600.0 / layers
+    retained_energy_kj = energy_kj_per_layer * max(float(heat_retention_pct), 0.0) / 100.0
+    raw_rise_c_per_layer = retained_energy_kj / heat_capacity_kj_c if heat_capacity_kj_c > 0 else 0.0
+    layer_time_min = max(float(ded_analysis.get("deposition_time_h", 0.0)), 0.0) * 60.0 / layers
+    passive_cooling_c = max(float(cooling_rate_c_min), 0.0) * layer_time_min
+    net_rise_c_per_layer = max(0.0, raw_rise_c_per_layer - passive_cooling_c)
+    accumulation_layers = min(layers, 12)
+    estimated_interpass_c = max(float(preheat_temp_c), 0.0) + net_rise_c_per_layer * accumulation_layers
+    over_limit_c = max(0.0, estimated_interpass_c - max(float(interpass_limit_c), 0.0))
+    dwell_min_per_layer = (
+        over_limit_c / max(float(cooling_rate_c_min), 0.001)
+        if over_limit_c > 0 else 0.0
+    )
+    total_dwell_h = dwell_min_per_layer * max(layers - 1, 0) / 60.0
+
+    if over_limit_c <= 0:
+        status = "Controlled"
+        score = 100
+    elif total_dwell_h <= max(float(ded_analysis.get("cell_time_h", 0.0)), 0.0) * 0.15:
+        status = "Dwell required"
+        score = 76
+    else:
+        status = "Thermal review"
+        score = 48
+
+    return {
+        "status": status,
+        "score": score,
+        "layer_time_min": layer_time_min,
+        "energy_kj_per_layer": energy_kj_per_layer,
+        "raw_rise_c_per_layer": raw_rise_c_per_layer,
+        "passive_cooling_c_per_layer": passive_cooling_c,
+        "net_rise_c_per_layer": net_rise_c_per_layer,
+        "estimated_interpass_c": estimated_interpass_c,
+        "interpass_limit_c": float(interpass_limit_c),
+        "over_limit_c": over_limit_c,
+        "dwell_min_per_layer": dwell_min_per_layer,
+        "total_dwell_h": total_dwell_h,
+        "heat_retention_pct": float(heat_retention_pct),
+    }
+
+
+def estimate_robot_cell_handoff(
+    *,
+    ded_analysis: dict[str, Any],
+    production_segment_count: int,
+    robot_reach_mm: float,
+    positioner_payload_kg: float,
+    fixture_mass_kg: float,
+    torch_clearance_mm: float,
+    program_point_limit: int,
+) -> dict[str, Any]:
+    """Estimate robot-cell reach, payload, and program-size feasibility."""
+    width = max(float(ded_analysis.get("bbox_width_mm", 0.0)), 0.0)
+    depth = max(float(ded_analysis.get("bbox_depth_mm", 0.0)), 0.0)
+    height = max(float(ded_analysis.get("model_height_mm", 0.0)), 0.0)
+    half_diagonal = math.hypot(width / 2.0, depth / 2.0)
+    reach_required_mm = math.hypot(half_diagonal + max(float(torch_clearance_mm), 0.0), height * 0.35)
+    reach_utilization_pct = 100.0 * reach_required_mm / max(float(robot_reach_mm), 0.001)
+
+    payload_required_kg = (
+        max(float(ded_analysis.get("near_net_mass_kg", 0.0)), 0.0)
+        + max(float(fixture_mass_kg), 0.0)
+    )
+    payload_utilization_pct = 100.0 * payload_required_kg / max(float(positioner_payload_kg), 0.001)
+    point_utilization_pct = 100.0 * max(int(production_segment_count), 0) / max(int(program_point_limit), 1)
+
+    blockers: list[str] = []
+    warnings: list[str] = []
+    if reach_utilization_pct > 100:
+        blockers.append("Estimated tool center point exceeds configured robot reach.")
+    elif reach_utilization_pct > 85:
+        warnings.append("Robot reach utilization is high; review orientation and positioner strategy.")
+    if payload_utilization_pct > 100:
+        blockers.append("Part plus fixture mass exceeds positioner payload.")
+    elif payload_utilization_pct > 85:
+        warnings.append("Payload utilization is high; verify fixture and dynamic load assumptions.")
+    if point_utilization_pct > 100:
+        warnings.append("Robot program may need splitting or path compression.")
+
+    score = 100 - 35 * len(blockers) - 12 * len(warnings)
+    score = max(0, min(100, score))
+    status = "Blocked" if blockers else "Review" if warnings else "Ready"
+    return {
+        "status": status,
+        "score": score,
+        "reach_required_mm": reach_required_mm,
+        "reach_utilization_pct": reach_utilization_pct,
+        "payload_required_kg": payload_required_kg,
+        "payload_utilization_pct": payload_utilization_pct,
+        "program_points": int(production_segment_count),
+        "point_utilization_pct": point_utilization_pct,
+        "blockers": blockers,
+        "warnings": warnings,
+    }
+
+
+def build_qualification_plan(
+    *,
+    partner_fit: dict[str, Any] | None,
+    thermal_plan: dict[str, Any] | None,
+    robot_handoff: dict[str, Any] | None,
+    qualification_level: str,
+    material_strategy: str,
+    ndt_required: bool,
+    finish_tolerance_mm: float,
+) -> dict[str, Any]:
+    """Build a practical evidence plan for customer and production sign-off."""
+    qualification = str(qualification_level)
+    coupons = {
+        "Prototype": 2,
+        "Industrial": 4,
+        "Aerospace / safety critical": 8,
+    }.get(qualification, 4)
+    if material_strategy != "Single material":
+        coupons += 2
+    if thermal_plan and thermal_plan.get("status") != "Controlled":
+        coupons += 2
+
+    inspections = ["Dimensional inspection", "Visual weld bead review"]
+    if ndt_required:
+        inspections.extend(["Dye penetrant or magnetic particle inspection", "Ultrasonic inspection"])
+    if finish_tolerance_mm < 0.25:
+        inspections.append("CMM inspection after finish machining")
+    if qualification == "Aerospace / safety critical":
+        inspections.extend(["Tensile coupons", "Metallography", "Hardness map", "Traceability dossier"])
+    elif qualification == "Industrial":
+        inspections.extend(["Hardness spot checks", "Macro-section coupon"])
+
+    risks: list[str] = []
+    if partner_fit and partner_fit.get("blockers"):
+        risks.extend(str(item) for item in partner_fit.get("blockers", []))
+    if thermal_plan and thermal_plan.get("status") == "Thermal review":
+        risks.append("Interpass temperature control requires process development.")
+    if robot_handoff and robot_handoff.get("status") == "Blocked":
+        risks.extend(str(item) for item in robot_handoff.get("blockers", []))
+
+    score = 100
+    score -= 10 if qualification == "Industrial" else 22 if qualification == "Aerospace / safety critical" else 0
+    score -= 8 if material_strategy != "Single material" else 0
+    score -= 7 if ndt_required else 0
+    score -= 25 if risks else 0
+    score = max(0, min(100, score))
+    status = "Release ready" if score >= 82 else "Engineering review" if score >= 60 else "Qualification hold"
+
+    return {
+        "status": status,
+        "score": score,
+        "coupon_count": coupons,
+        "inspection_steps": inspections,
+        "risks": risks,
+        "records": [
+            "Frozen CAD and parameter snapshot",
+            "Plan fingerprint and segment ledger",
+            "Machine setup sheet",
+            "Wire lot and shielding gas traceability",
+            "Post-machining and inspection report",
+        ],
+    }
+
+
+def build_production_handoff_recommendations(
+    *,
+    thermal_plan: dict[str, Any] | None,
+    robot_handoff: dict[str, Any] | None,
+    qualification_plan: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Return prioritized actions from thermal, robot, and qualification plans."""
+    rows: list[dict[str, Any]] = []
+
+    def add(priority: str, area: str, title: str, action: str, impact: str) -> None:
+        rows.append({
+            "priority": priority,
+            "priority_score": PRIORITY_RANK.get(priority, 0),
+            "area": area,
+            "title": title,
+            "action": action,
+            "impact": impact,
+            "owner": "Manufacturing",
+        })
+
+    if thermal_plan:
+        if thermal_plan.get("status") == "Thermal review":
+            add(
+                "High",
+                "Thermal",
+                "Interpass control needs process development",
+                "Add dwell, lower heat input, or split the build into controlled sequences.",
+                f"Estimated interpass is {float(thermal_plan['estimated_interpass_c']):.1f} C.",
+            )
+        elif thermal_plan.get("status") == "Dwell required":
+            add(
+                "Medium",
+                "Thermal",
+                "Interpass dwell required",
+                "Add programmed dwell or active cooling before production release.",
+                f"{float(thermal_plan['dwell_min_per_layer']):.1f} min/layer estimated dwell.",
+            )
+
+    if robot_handoff:
+        for blocker in robot_handoff.get("blockers", []):
+            add(
+                "Critical",
+                "Robot cell",
+                "Robot handoff blocked",
+                "Review cell reach, payload, fixturing, or build segmentation.",
+                str(blocker),
+            )
+        for warning in robot_handoff.get("warnings", []):
+            add(
+                "Medium",
+                "Robot cell",
+                "Robot handoff review",
+                "Validate offline program, reach envelope, and fixture assumptions.",
+                str(warning),
+            )
+
+    if qualification_plan and qualification_plan.get("status") == "Qualification hold":
+        add(
+            "High",
+            "Qualification",
+            "Qualification evidence is not release-ready",
+            "Complete coupon, inspection, and traceability plan before customer handoff.",
+            f"Qualification score is {int(qualification_plan.get('score', 0))}/100.",
+        )
+
+    return sorted(
+        rows,
+        key=lambda item: (-int(item["priority_score"]), str(item["area"]), str(item["title"])),
+    )
+
+
 def build_quality_scorecard(
     *,
     readiness: dict[str, Any],
@@ -1030,6 +1276,9 @@ def generate_job_dossier_markdown(
     optimization_playbook: list[dict[str, Any]] | None = None,
     ded_analysis: dict[str, Any] | None = None,
     partner_fit: dict[str, Any] | None = None,
+    thermal_plan: dict[str, Any] | None = None,
+    robot_handoff: dict[str, Any] | None = None,
+    qualification_plan: dict[str, Any] | None = None,
 ) -> str:
     """Build a concise production dossier suitable for customers and managers."""
     issues = readiness.get("issues", [])
@@ -1100,6 +1349,37 @@ def generate_job_dossier_markdown(
         ]
         if partner_fit else ["- Manufacturing partner fit was not assessed for this run."]
     )
+    thermal_lines = (
+        [
+            f"- Status: {thermal_plan.get('status', 'Review')}",
+            f"- Estimated interpass: {thermal_plan.get('estimated_interpass_c', 0.0):.1f} C",
+            f"- Interpass limit: {thermal_plan.get('interpass_limit_c', 0.0):.1f} C",
+            f"- Dwell per layer: {thermal_plan.get('dwell_min_per_layer', 0.0):.1f} min",
+            f"- Total dwell: {thermal_plan.get('total_dwell_h', 0.0):.2f} h",
+        ]
+        if thermal_plan else ["- Thermal / interpass model was not enabled for this run."]
+    )
+    robot_lines = (
+        [
+            f"- Status: {robot_handoff.get('status', 'Review')}",
+            f"- Reach utilization: {robot_handoff.get('reach_utilization_pct', 0.0):.1f}%",
+            f"- Payload utilization: {robot_handoff.get('payload_utilization_pct', 0.0):.1f}%",
+            f"- Program points: {robot_handoff.get('program_points', 0):,}",
+            *[f"- BLOCKER: {item}" for item in robot_handoff.get("blockers", [])],
+            *[f"- REVIEW: {item}" for item in robot_handoff.get("warnings", [])],
+        ]
+        if robot_handoff else ["- Robot-cell handoff model was not enabled for this run."]
+    )
+    qualification_lines = (
+        [
+            f"- Status: {qualification_plan.get('status', 'Review')}",
+            f"- Coupon count: {qualification_plan.get('coupon_count', 0)}",
+            "- Inspections: " + "; ".join(qualification_plan.get("inspection_steps", [])),
+            "- Records: " + "; ".join(qualification_plan.get("records", [])),
+            *[f"- RISK: {item}" for item in qualification_plan.get("risks", [])],
+        ]
+        if qualification_plan else ["- Qualification package was not generated for this run."]
+    )
 
     return "\n".join([
         f"# MiniSlicer Job Dossier: {job_name}",
@@ -1169,6 +1449,16 @@ def generate_job_dossier_markdown(
         "",
         "## Manufacturing Partner Fit",
         *partner_lines,
+        "",
+        "## Production Handoff",
+        "### Thermal / Interpass",
+        *thermal_lines,
+        "",
+        "### Robot Cell",
+        *robot_lines,
+        "",
+        "### Qualification Package",
+        *qualification_lines,
         "",
         "## Release Checklist",
         *checklist_lines,

@@ -7,12 +7,16 @@ from src.job_analysis import (
     build_ded_recommendations,
     build_launch_recommendations,
     build_optimization_playbook,
+    build_production_handoff_recommendations,
     build_quality_scorecard,
+    build_qualification_plan,
     build_release_checklist,
     classify_program_risk,
     compute_launch_score,
     estimate_ded_process,
     estimate_job_economics,
+    estimate_robot_cell_handoff,
+    estimate_thermal_management,
     generate_job_dossier_html,
     generate_job_dossier_markdown,
 )
@@ -497,6 +501,84 @@ def test_manufacturing_partner_fit_flags_tight_tolerance_blocker() -> None:
     assert any("Tolerance" in blocker for blocker in fit["blockers"])
 
 
+def test_thermal_management_estimates_dwell_when_interpass_exceeds_limit() -> None:
+    thermal = estimate_thermal_management(
+        ded_analysis={
+            "near_net_mass_kg": 0.8,
+            "arc_energy_kwh": 2.0,
+            "deposition_time_h": 0.8,
+            "cell_time_h": 1.2,
+        },
+        layer_count=4,
+        preheat_temp_c=120.0,
+        interpass_limit_c=180.0,
+        cooling_rate_c_min=1.0,
+        heat_retention_pct=80.0,
+    )
+
+    assert thermal["estimated_interpass_c"] > thermal["interpass_limit_c"]
+    assert thermal["dwell_min_per_layer"] > 0
+    assert thermal["status"] in {"Dwell required", "Thermal review"}
+
+
+def test_robot_cell_handoff_flags_reach_and_payload_limits() -> None:
+    handoff = estimate_robot_cell_handoff(
+        ded_analysis={
+            "bbox_width_mm": 1200.0,
+            "bbox_depth_mm": 800.0,
+            "model_height_mm": 1400.0,
+            "near_net_mass_kg": 450.0,
+        },
+        production_segment_count=60_000,
+        robot_reach_mm=900.0,
+        positioner_payload_kg=400.0,
+        fixture_mass_kg=80.0,
+        torch_clearance_mm=150.0,
+        program_point_limit=25_000,
+    )
+
+    assert handoff["status"] == "Blocked"
+    assert handoff["blockers"]
+    assert handoff["point_utilization_pct"] > 100
+
+
+def test_qualification_plan_scales_with_material_strategy_and_thermal_risk() -> None:
+    plan = build_qualification_plan(
+        partner_fit={"blockers": []},
+        thermal_plan={"status": "Thermal review"},
+        robot_handoff={"status": "Ready", "blockers": []},
+        qualification_level="Aerospace / safety critical",
+        material_strategy="Wear-facing / gradient",
+        ndt_required=True,
+        finish_tolerance_mm=0.1,
+    )
+
+    assert plan["coupon_count"] >= 12
+    assert "Metallography" in plan["inspection_steps"]
+    assert "CMM inspection after finish machining" in plan["inspection_steps"]
+    assert plan["status"] in {"Engineering review", "Qualification hold"}
+
+
+def test_production_handoff_recommendations_prioritize_blockers() -> None:
+    recommendations = build_production_handoff_recommendations(
+        thermal_plan={
+            "status": "Thermal review",
+            "estimated_interpass_c": 340.0,
+            "dwell_min_per_layer": 4.0,
+        },
+        robot_handoff={
+            "status": "Blocked",
+            "blockers": ["Estimated tool center point exceeds configured robot reach."],
+            "warnings": [],
+        },
+        qualification_plan={"status": "Qualification hold", "score": 42},
+    )
+
+    assert recommendations[0]["priority"] == "Critical"
+    assert any(row["area"] == "Thermal" for row in recommendations)
+    assert any(row["area"] == "Qualification" for row in recommendations)
+
+
 def test_dossier_contains_traceable_summary() -> None:
     economics = estimate_job_economics(
         metrics=_metrics(),
@@ -592,6 +674,28 @@ def test_dossier_contains_traceable_summary() -> None:
             "value_delta_pct": 33.3,
             "deliverables": ["DfAM redesign review", "Post-machining and inspection plan"],
         },
+        thermal_plan={
+            "status": "Controlled",
+            "estimated_interpass_c": 160.0,
+            "interpass_limit_c": 250.0,
+            "dwell_min_per_layer": 0.0,
+            "total_dwell_h": 0.0,
+        },
+        robot_handoff={
+            "status": "Ready",
+            "reach_utilization_pct": 62.0,
+            "payload_utilization_pct": 18.0,
+            "program_points": 800,
+            "blockers": [],
+            "warnings": [],
+        },
+        qualification_plan={
+            "status": "Release ready",
+            "coupon_count": 4,
+            "inspection_steps": ["Dimensional inspection", "Macro-section coupon"],
+            "records": ["Frozen CAD and parameter snapshot", "Machine setup sheet"],
+            "risks": [],
+        },
     )
     html = generate_job_dossier_html(dossier)
 
@@ -605,5 +709,9 @@ def test_dossier_contains_traceable_summary() -> None:
     assert "What-If Playbook" in dossier
     assert "DED Process Model" in dossier
     assert "Manufacturing Partner Fit" in dossier
+    assert "Production Handoff" in dossier
+    assert "Thermal / Interpass" in dossier
+    assert "Robot Cell" in dossier
+    assert "Qualification Package" in dossier
     assert "Release Checklist" in dossier
     assert "<!doctype html>" in html
