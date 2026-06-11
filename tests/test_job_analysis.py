@@ -4,6 +4,7 @@ from src.job_analysis import (
     assess_commercial_fit,
     build_batch_scenarios,
     build_launch_recommendations,
+    build_optimization_playbook,
     build_quality_scorecard,
     build_release_checklist,
     classify_program_risk,
@@ -297,6 +298,79 @@ def test_release_checklist_tracks_export_and_traceability() -> None:
     assert checklist[3]["state"] == "Locked"
 
 
+def test_optimization_playbook_quantifies_pattern_and_batch_levers() -> None:
+    batch_scenarios = [
+        {
+            "quantity": 1,
+            "unit_quote": 20.0,
+            "batch_quote": 20.0,
+            "batch_machine_hours": 1.0,
+            "target_delta_pct": 0.0,
+            "lead_time_delta_h": 0.0,
+            "status": "Fit",
+        },
+        {
+            "quantity": 10,
+            "unit_quote": 12.0,
+            "batch_quote": 120.0,
+            "batch_machine_hours": 10.0,
+            "target_delta_pct": 0.0,
+            "lead_time_delta_h": 0.0,
+            "status": "Fit",
+        },
+    ]
+    playbook = build_optimization_playbook(
+        current_pattern="Grid",
+        pattern_ranking=[
+            {
+                "pattern": "Concentric",
+                "path_mm": 80.0,
+                "travel_mm": 10.0,
+                "line_count": 8,
+                "efficiency_pct": 88.9,
+            },
+            {
+                "pattern": "Grid",
+                "path_mm": 110.0,
+                "travel_mm": 25.0,
+                "line_count": 20,
+                "efficiency_pct": 81.5,
+            },
+        ],
+        metrics={"path_efficiency_pct": 82.0},
+        economics={"batch_quantity": 1.0, "volumetric_flow_mm3_s": 4.0},
+        batch_scenarios=batch_scenarios,
+        print_speed_mm_s=50.0,
+        layer_height_mm=0.2,
+        nozzle_diameter_mm=0.4,
+        travel_ratio_pct=12.0,
+        production_enabled=True,
+    )
+
+    assert playbook[0]["lever"] == "Pattern switch"
+    assert any(row["lever"] == "Batch sizing" for row in playbook)
+    assert any(row["lever"] == "Release package" for row in playbook)
+
+
+def test_optimization_playbook_flags_high_flow_reduction() -> None:
+    playbook = build_optimization_playbook(
+        current_pattern="Grid",
+        pattern_ranking=[],
+        metrics={"path_efficiency_pct": 72.0},
+        economics={"batch_quantity": 1.0, "volumetric_flow_mm3_s": 19.2},
+        batch_scenarios=[],
+        print_speed_mm_s=60.0,
+        layer_height_mm=0.4,
+        nozzle_diameter_mm=0.8,
+        travel_ratio_pct=18.0,
+        production_enabled=False,
+    )
+
+    flow = next(row for row in playbook if row["lever"] == "Flow envelope")
+    assert flow["confidence"] == "High"
+    assert "under the high-risk warning band" in flow["estimated_delta"]
+
+
 def test_dossier_contains_traceable_summary() -> None:
     economics = estimate_job_economics(
         metrics=_metrics(),
@@ -360,6 +434,15 @@ def test_dossier_contains_traceable_summary() -> None:
         release_checklist=[
             {"item": "Traceability", "state": "Locked", "detail": "Plan ID abcdef1234567890"}
         ],
+        optimization_playbook=[
+            {
+                "lever": "Pattern switch",
+                "current": "Grid",
+                "proposed": "Concentric",
+                "estimated_delta": "12.0% less active-layer motion",
+                "confidence": "High",
+            }
+        ],
     )
     html = generate_job_dossier_html(dossier)
 
@@ -370,5 +453,6 @@ def test_dossier_contains_traceable_summary() -> None:
     assert "Commercial fit" in dossier
     assert "Launch Optimizer" in dossier
     assert "Batch Scenarios" in dossier
+    assert "What-If Playbook" in dossier
     assert "Release Checklist" in dossier
     assert "<!doctype html>" in html

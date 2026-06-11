@@ -16,6 +16,7 @@ from src.job_analysis import (
     assess_commercial_fit,
     build_batch_scenarios,
     build_launch_recommendations,
+    build_optimization_playbook,
     build_quality_scorecard,
     build_release_checklist,
     classify_program_risk,
@@ -620,6 +621,18 @@ batch_scenarios = build_batch_scenarios(
     max_lead_time_h=float(max_lead_time_h),
     quantities=scenario_quantities,
 )
+optimization_playbook = build_optimization_playbook(
+    current_pattern=str(infill_pattern),
+    pattern_ranking=pattern_ranking,
+    metrics=metrics,
+    economics=economics,
+    batch_scenarios=batch_scenarios,
+    print_speed_mm_s=float(print_speed),
+    layer_height_mm=float(layer_height),
+    nozzle_diameter_mm=float(nozzle_diameter),
+    travel_ratio_pct=float(travel_ratio),
+    production_enabled=production_enabled,
+)
 release_checklist = build_release_checklist(
     readiness=readiness,
     commercial_fit=commercial_fit,
@@ -971,7 +984,12 @@ with tab_release:
 
     st.markdown("---")
     st.markdown("### Launch Optimizer")
-    render_launch_optimizer(launch_recommendations, batch_scenarios, release_checklist)
+    render_launch_optimizer(
+        launch_recommendations,
+        batch_scenarios,
+        release_checklist,
+        optimization_playbook,
+    )
 
     st.markdown("---")
 
@@ -1047,6 +1065,7 @@ with tab_release:
         "launch_recommendations": launch_recommendations,
         "batch_scenarios": batch_scenarios,
         "release_checklist": release_checklist,
+        "optimization_playbook": optimization_playbook,
         "business_assumptions": {
             "quote_profile": quote_profile,
             "batch_quantity": int(batch_quantity),
@@ -1122,6 +1141,7 @@ with tab_release:
         recommendations=launch_recommendations,
         batch_scenarios=batch_scenarios,
         release_checklist=release_checklist,
+        optimization_playbook=optimization_playbook,
     )
     dossier_html = generate_job_dossier_html(dossier_md)
     render_export_panel(

@@ -17,7 +17,7 @@ the target machine before release.
 | Toolpaths | Inward perimeters, parallel, zigzag, grid, triangular, honeycomb, and concentric infill |
 | Planning Engine | Typed toolpath settings, reusable layer planner, full-build segment generation, pattern ranking, and deterministic plan fingerprints |
 | Planning | Per-layer and full-build path estimates, acceleration-aware motion time, travel share, and material use |
-| Executive Review | Launch score, readiness score, program risk, unit/batch quote, productivity, launch optimizer, batch scenarios, release checklist, quality scorecard, and cost-stack view |
+| Executive Review | Launch score, readiness score, program risk, unit/batch quote, productivity, launch optimizer, what-if playbook, batch scenarios, release checklist, quality scorecard, and cost-stack view |
 | Quality Gates | Plate fit, missing paths, tall layer height, sparse infill, high travel, heavy path count, tall builds, and volumetric flow |
 | Commercial Controls | Customer/job metadata, batch quantity, target price, machine rate, labor rate, setup time, postprocess time, scrap, margin, and lead-time guardrails |
 | Visualization | Toolpath, extrusion-width, speed map, time map, density map, animation, and 3D layer stack views |
@@ -66,7 +66,7 @@ streamlit run app.py
 4. Set job metadata, batch quantity, quote assumptions, target price, and
    machine-time guardrails in Business / Launch.
 5. Review the Executive, Quality, and Advisor tabs before exporting.
-6. Use the Launch Optimizer to review top moves, batch scenarios, and release checklist status.
+6. Use the Launch Optimizer to review top moves, what-if levers, batch scenarios, and release checklist status.
 7. Export a dossier for sign-off, plus data files for engineering traceability.
 8. Use production G-code only when readiness is unblocked, process mode is FDM,
    and the selected machine profile matches the physical printer.

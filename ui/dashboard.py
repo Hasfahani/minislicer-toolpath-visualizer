@@ -346,6 +346,7 @@ def render_launch_optimizer(
     recommendations: list[dict[str, Any]],
     batch_scenarios: list[dict[str, Any]],
     release_checklist: list[dict[str, str]],
+    optimization_playbook: list[dict[str, Any]],
 ) -> None:
     """Render ranked next moves, batch scenarios, and release checklist."""
     left, right = st.columns([1.22, 1.0])
@@ -370,6 +371,19 @@ def render_launch_optimizer(
         st.markdown(f'<div class="optimizer-grid">{cards}</div>', unsafe_allow_html=True)
 
     with right:
+        st.markdown("#### What-If Playbook")
+        playbook_rows = [
+            {
+                "lever": row["lever"],
+                "current": row["current"],
+                "proposed": row["proposed"],
+                "estimated delta": row["estimated_delta"],
+                "confidence": row["confidence"],
+            }
+            for row in optimization_playbook
+        ]
+        st.dataframe(playbook_rows, hide_index=True, width="stretch")
+
         st.markdown("#### Release Checklist")
         st.dataframe(release_checklist, hide_index=True, width="stretch")
 

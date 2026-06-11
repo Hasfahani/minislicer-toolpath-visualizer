@@ -435,6 +435,147 @@ def build_release_checklist(
     ]
 
 
+def build_optimization_playbook(
+    *,
+    current_pattern: str,
+    pattern_ranking: list[dict[str, Any]],
+    metrics: dict[str, Any],
+    economics: dict[str, float],
+    batch_scenarios: list[dict[str, Any]],
+    print_speed_mm_s: float,
+    layer_height_mm: float,
+    nozzle_diameter_mm: float,
+    travel_ratio_pct: float,
+    production_enabled: bool,
+) -> list[dict[str, Any]]:
+    """Return quantified what-if levers for improving launch outcomes."""
+    rows: list[dict[str, Any]] = []
+
+    def add(
+        *,
+        lever: str,
+        current: str,
+        proposed: str,
+        estimated_delta: str,
+        confidence: str,
+        impact_score: int,
+    ) -> None:
+        rows.append({
+            "lever": lever,
+            "current": current,
+            "proposed": proposed,
+            "estimated_delta": estimated_delta,
+            "confidence": confidence,
+            "impact_score": int(impact_score),
+        })
+
+    current_rank = next(
+        (row for row in pattern_ranking if row.get("pattern") == current_pattern),
+        None,
+    )
+    best_pattern = pattern_ranking[0] if pattern_ranking else None
+    if best_pattern and current_rank:
+        current_motion = float(current_rank["path_mm"]) + float(current_rank["travel_mm"])
+        best_motion = float(best_pattern["path_mm"]) + float(best_pattern["travel_mm"])
+        saving_pct = 100.0 * max(0.0, current_motion - best_motion) / current_motion
+        if best_pattern["pattern"] != current_pattern and saving_pct >= 1.0:
+            add(
+                lever="Pattern switch",
+                current=current_pattern,
+                proposed=str(best_pattern["pattern"]),
+                estimated_delta=f"{saving_pct:.1f}% less active-layer motion",
+                confidence="High",
+                impact_score=90,
+            )
+        else:
+            add(
+                lever="Pattern selection",
+                current=current_pattern,
+                proposed="Keep current pattern",
+                estimated_delta="Current pattern is already near the ranked best",
+                confidence="High",
+                impact_score=45,
+            )
+
+    current_qty = max(1, int(economics.get("batch_quantity", 1)))
+    current_scenario = next(
+        (row for row in batch_scenarios if int(row["quantity"]) == current_qty),
+        None,
+    )
+    best_batch = min(batch_scenarios, key=lambda row: float(row["unit_quote"]), default=None)
+    if current_scenario and best_batch:
+        current_quote = float(current_scenario["unit_quote"])
+        best_quote = float(best_batch["unit_quote"])
+        saving = max(0.0, current_quote - best_quote)
+        if int(best_batch["quantity"]) != current_qty and saving > 0:
+            saving_pct = 100.0 * saving / current_quote if current_quote > 0 else 0.0
+            add(
+                lever="Batch sizing",
+                current=f"{current_qty} pcs",
+                proposed=f"{int(best_batch['quantity'])} pcs",
+                estimated_delta=f"${saving:.2f}/part lower quote ({saving_pct:.1f}%)",
+                confidence="Medium",
+                impact_score=78,
+            )
+
+    flow = float(economics.get("volumetric_flow_mm3_s", 0.0))
+    bead_area = max(float(layer_height_mm) * float(nozzle_diameter_mm), 0.0)
+    default_safe_speed = 10.0 / bead_area if bead_area > 0 else print_speed_mm_s
+    warning_speed = 14.0 / bead_area if bead_area > 0 else print_speed_mm_s
+    if flow > 14.0:
+        add(
+            lever="Flow envelope",
+            current=f"{print_speed_mm_s:.0f} mm/s, {flow:.1f} mm3/s",
+            proposed=f"{warning_speed:.0f} mm/s or lower",
+            estimated_delta="Brings flow back under the high-risk warning band",
+            confidence="High",
+            impact_score=88,
+        )
+    elif flow < 8.0 and travel_ratio_pct < 25:
+        proposed_speed = min(float(print_speed_mm_s) * 1.15, default_safe_speed)
+        if proposed_speed > float(print_speed_mm_s) + 1.0:
+            time_gain_pct = 100.0 * (1.0 - float(print_speed_mm_s) / proposed_speed)
+            add(
+                lever="Speed tuning",
+                current=f"{print_speed_mm_s:.0f} mm/s",
+                proposed=f"{proposed_speed:.0f} mm/s",
+                estimated_delta=f"Up to {time_gain_pct:.1f}% shorter extrusion time",
+                confidence="Medium",
+                impact_score=64,
+            )
+
+    if travel_ratio_pct > 22:
+        add(
+            lever="Travel reduction",
+            current=f"{travel_ratio_pct:.1f}% travel share",
+            proposed="Keep optimization on and compare low-travel patterns",
+            estimated_delta="Reduces non-extruding motion and idle machine time",
+            confidence="Medium",
+            impact_score=70,
+        )
+
+    if production_enabled:
+        add(
+            lever="Release package",
+            current="Guardrails clear",
+            proposed="Export dossier plus production G-code",
+            estimated_delta="Ready for controlled machine-specific review",
+            confidence="High",
+            impact_score=58,
+        )
+    else:
+        add(
+            lever="Release package",
+            current="Production export guarded",
+            proposed="Clear release gates before G-code handoff",
+            estimated_delta="Prevents unsafe or incomplete production release",
+            confidence="High",
+            impact_score=86,
+        )
+
+    return sorted(rows, key=lambda row: -int(row["impact_score"]))
+
+
 def build_quality_scorecard(
     *,
     readiness: dict[str, Any],
@@ -539,6 +680,7 @@ def generate_job_dossier_markdown(
     recommendations: list[dict[str, Any]] | None = None,
     batch_scenarios: list[dict[str, Any]] | None = None,
     release_checklist: list[dict[str, str]] | None = None,
+    optimization_playbook: list[dict[str, Any]] | None = None,
 ) -> str:
     """Build a concise production dossier suitable for customers and managers."""
     issues = readiness.get("issues", [])
@@ -575,6 +717,12 @@ def generate_job_dossier_markdown(
         f"- {row['item']}: {row['state']} - {row['detail']}"
         for row in (release_checklist or [])
     ] or ["- Release checklist was not generated."]
+    playbook_lines = [
+        "- {lever}: {current} -> {proposed} ({estimated_delta}, {confidence} confidence)".format(
+            **row
+        )
+        for row in (optimization_playbook or [])
+    ] or ["- Optimization playbook was not generated."]
 
     return "\n".join([
         f"# MiniSlicer Job Dossier: {job_name}",
@@ -635,6 +783,9 @@ def generate_job_dossier_markdown(
         "",
         "## Batch Scenarios",
         *scenario_lines,
+        "",
+        "## What-If Playbook",
+        *playbook_lines,
         "",
         "## Release Checklist",
         *checklist_lines,
