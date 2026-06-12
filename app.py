@@ -26,13 +26,20 @@ from src.job_analysis import (
     classify_program_risk,
     compute_launch_score,
     estimate_ded_process,
+    estimate_job_economics,
     estimate_robot_cell_handoff,
     estimate_thermal_management,
-    estimate_job_economics,
     generate_job_dossier_html,
     generate_job_dossier_markdown,
 )
 from src.metrics import MATERIAL_DENSITY, summarize_metrics
+from src.planner import (
+    ToolpathSettings,
+    build_plan_fingerprint,
+    build_production_segments,
+    plan_layer,
+    rank_infill_patterns,
+)
 from src.plotting import (
     create_comparison_figure,
     create_infill_length_histogram,
@@ -42,16 +49,8 @@ from src.plotting import (
     create_time_map_figure,
     create_toolpath_figure,
 )
-from src.planner import (
-    ToolpathSettings,
-    alternating_layer_angle,
-    build_plan_fingerprint,
-    build_production_segments,
-    plan_layer,
-    rank_infill_patterns,
-)
-from src.svg_import import parse_svg_to_polygon
 from src.stl_import import slice_stl_to_polygon
+from src.svg_import import parse_svg_to_polygon
 from src.toolpaths import (
     generate_infill,
     generate_inward_perimeters,
@@ -62,8 +61,8 @@ from src.workflow import apply_placement, build_shape, fmt_time, largest_polygon
 from ui.dashboard import (
     render_ded_process_panel,
     render_executive_dashboard,
-    render_launch_ribbon,
     render_launch_optimizer,
+    render_launch_ribbon,
     render_next_action,
     render_partner_fit_panel,
     render_pattern_ranking,
@@ -74,7 +73,6 @@ from ui.dashboard import (
 from ui.export_panel import render_export_panel
 from ui.sidebar import render_quick_setup, render_sidebar
 from ui.stl_workflow import render_stl_multilayer_view
-
 
 # ---------------------------------------------------------------------------
 # Performance: cached wrappers for expensive geometry/toolpath computations.
@@ -242,7 +240,9 @@ def app_css() -> None:
         .quality-warn { border-top: 3px solid var(--ms-amber); }
         .quality-bad { border-top: 3px solid var(--ms-red); }
         .quality-top { color: var(--ms-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 760; }
-        .quality-score { color: var(--ms-ink); font-size: 1.55rem; font-weight: 820; line-height: 1.1; margin-top: 0.25rem; }
+        .quality-score {
+            color: var(--ms-ink); font-size: 1.55rem; font-weight: 820; line-height: 1.1; margin-top: 0.25rem;
+        }
         .quality-score span { color: var(--ms-muted); font-size: 0.72rem; font-weight: 680; }
         .quality-state { color: var(--ms-ink); font-size: 0.82rem; font-weight: 720; margin-top: 0.16rem; }
         .quality-signal { color: var(--ms-muted); font-size: 0.76rem; line-height: 1.25; margin-top: 0.2rem; }
@@ -275,7 +275,9 @@ def app_css() -> None:
             .launch-money { text-align: left; }
         }
         @media (max-width: 640px) {
-            .exec-strip, .exec-hero, .quality-grid, .quality-hero, .pattern-winner, .export-package { grid-template-columns: 1fr; }
+            .exec-strip, .exec-hero, .quality-grid, .quality-hero, .pattern-winner, .export-package {
+                grid-template-columns: 1fr;
+            }
             .exec-score { text-align: left; }
             .quality-total, .pattern-score, .export-stat { text-align: left; }
             .export-stat { border-left: 0; border-top: 1px solid var(--ms-line); padding: 0.65rem 0 0; }
@@ -332,7 +334,9 @@ def render_header() -> None:
             <div class="ms-header-icon">MS</div>
             <div>
                 <p class="ms-header-title">MiniSlicer Toolpath Planner</p>
-                <p class="ms-header-sub">Launch desk for additive planning, quoting, readiness, and traceable exports</p>
+                <p class="ms-header-sub">
+                    Launch desk for additive planning, quoting, readiness, and traceable exports
+                </p>
             </div>
             <div class="ms-header-badge">Manufacturing Command Center</div>
         </div>
@@ -369,7 +373,147 @@ controls = render_sidebar(
     SHAPE_ICONS,
     PATTERN_ICONS,
 )
-locals().update(controls)
+# Explicit unpacking of every sidebar setting consumed below. This documents
+# the app's full input surface and keeps the data flow visible to static
+# analysis (a previous locals().update() hid all of it).
+
+# Import (SVG / STL)
+uploaded_svg = controls["uploaded_svg"]
+svg_target_width = controls["svg_target_width"]
+uploaded_stl = controls["uploaded_stl"]
+stl_target_width = controls["stl_target_width"]
+stl_bytes = controls["stl_bytes"]
+stl_info = controls["stl_info"]
+stl_slice_z = controls["stl_slice_z"]
+
+# Shape
+shape_type = controls["shape_type"]
+width = controls["width"]
+height = controls["height"]
+radius = controls["radius"]
+corner_radius = controls["corner_radius"]
+sides = controls["sides"]
+points = controls["points"]
+inner_radius = controls["inner_radius"]
+size = controls["size"]
+arm_width = controls["arm_width"]
+length = controls["length"]
+head_width = controls["head_width"]
+shaft_width = controls["shaft_width"]
+coords_text = controls["coords_text"]
+
+# Toolpath
+perimeter_count = controls["perimeter_count"]
+perimeter_spacing = controls["perimeter_spacing"]
+infill_pattern = controls["infill_pattern"]
+infill_mode = controls["infill_mode"]
+infill_density = controls["infill_density"]
+infill_spacing = controls["infill_spacing"]
+infill_angle = controls["infill_angle"]
+alternate_angle = controls["alternate_angle"]
+infill_clearance = controls["infill_clearance"]
+infill_overlap = controls["infill_overlap"]
+perimeter_speed_mult = controls["perimeter_speed_mult"]
+
+# Print settings
+printer_profile_name = controls["printer_profile_name"]
+layer_number = controls["layer_number"]
+model_height = controls["model_height"]
+material_choice = controls["material_choice"]
+material_cost = controls["material_cost"]
+layer_height = controls["layer_height"]
+nozzle_diameter = controls["nozzle_diameter"]
+print_speed = controls["print_speed"]
+travel_speed = controls["travel_speed"]
+filament_diameter = controls["filament_diameter"]
+acceleration_mm_s2 = controls["acceleration_mm_s2"]
+
+# Business / launch
+job_name = controls["job_name"]
+customer_name = controls["customer_name"]
+owner_name = controls["owner_name"]
+job_id = controls["job_id"]
+batch_quantity = controls["batch_quantity"]
+target_unit_price = controls["target_unit_price"]
+application_type = controls["application_type"]
+conventional_route = controls["conventional_route"]
+urgency = controls["urgency"]
+qualification_level = controls["qualification_level"]
+material_strategy = controls["material_strategy"]
+quote_profile = controls["quote_profile"]
+machine_rate_per_h = controls["machine_rate_per_h"]
+labor_rate_per_h = controls["labor_rate_per_h"]
+setup_time_min = controls["setup_time_min"]
+postprocess_time_min = controls["postprocess_time_min"]
+scrap_allowance_pct = controls["scrap_allowance_pct"]
+margin_pct = controls["margin_pct"]
+max_lead_time_h = controls["max_lead_time_h"]
+finish_tolerance_mm = controls["finish_tolerance_mm"]
+annual_quantity = controls["annual_quantity"]
+ndt_required = controls["ndt_required"]
+redesign_required = controls["redesign_required"]
+
+# DED / wire-arc process
+ded_enabled = controls["ded_enabled"]
+ded_profile = controls["ded_profile"]
+ded_envelope_x_mm = controls["ded_envelope_x_mm"]
+ded_envelope_y_mm = controls["ded_envelope_y_mm"]
+ded_envelope_z_mm = controls["ded_envelope_z_mm"]
+ded_wire_diameter_mm = controls["ded_wire_diameter_mm"]
+ded_wire_feed_m_min = controls["ded_wire_feed_m_min"]
+ded_arc_current_a = controls["ded_arc_current_a"]
+ded_arc_voltage_v = controls["ded_arc_voltage_v"]
+ded_arc_efficiency_pct = controls["ded_arc_efficiency_pct"]
+ded_deposition_efficiency_pct = controls["ded_deposition_efficiency_pct"]
+ded_robot_utilization_pct = controls["ded_robot_utilization_pct"]
+ded_machining_allowance_pct = controls["ded_machining_allowance_pct"]
+ded_billet_buy_to_fly = controls["ded_billet_buy_to_fly"]
+ded_conventional_lead_time_weeks = controls["ded_conventional_lead_time_weeks"]
+ded_machine_capacity_h_week = controls["ded_machine_capacity_h_week"]
+ded_preheat_temp_c = controls["ded_preheat_temp_c"]
+ded_interpass_limit_c = controls["ded_interpass_limit_c"]
+ded_cooling_rate_c_min = controls["ded_cooling_rate_c_min"]
+ded_heat_retention_pct = controls["ded_heat_retention_pct"]
+ded_robot_reach_mm = controls["ded_robot_reach_mm"]
+ded_positioner_payload_kg = controls["ded_positioner_payload_kg"]
+ded_fixture_mass_kg = controls["ded_fixture_mass_kg"]
+ded_torch_clearance_mm = controls["ded_torch_clearance_mm"]
+ded_program_point_limit = controls["ded_program_point_limit"]
+
+# Placement
+show_plate = controls["show_plate"]
+scale_pct = controls["scale_pct"]
+rotate_deg = controls["rotate_deg"]
+center_on_plate = controls["center_on_plate"]
+fit_to_plate = controls["fit_to_plate"]
+plate_margin = controls["plate_margin"]
+plate_w = controls["plate_w"]
+plate_d = controls["plate_d"]
+mirror_x = controls["mirror_x"]
+mirror_y = controls["mirror_y"]
+translate_x = controls["translate_x"]
+translate_y = controls["translate_y"]
+
+# Preview appearance and quality/export
+color_scheme = controls["color_scheme"]
+line_width_scale = controls["line_width_scale"]
+show_boundary = controls["show_boundary"]
+show_perimeters = controls["show_perimeters"]
+show_infill = controls["show_infill"]
+show_dimensions = controls["show_dimensions"]
+show_travel = controls["show_travel"]
+show_seams = controls["show_seams"]
+show_start_end = controls["show_start_end"]
+show_arrows = controls["show_arrows"]
+show_extrusion = controls["show_extrusion"]
+optimize_perimeters = controls["optimize_perimeters"]
+optimize_infill = controls["optimize_infill"]
+reverse_lines = controls["reverse_lines"]
+simplify_tolerance = controls["simplify_tolerance"]
+min_segment_length = controls["min_segment_length"]
+z_hop = controls["z_hop"]
+extrusion_per_mm = controls["extrusion_per_mm"]
+include_e = controls["include_e"]
 
 shape_settings = {
     "width": width, "height": height, "radius": radius,
@@ -896,7 +1040,7 @@ with tab_plan:
                 ("Best efficiency", best_efficiency["pattern"], f"{best_efficiency['efficiency_pct']:.1f}%"),
             ]
             di_cols = st.columns(4)
-            for col, (label, pattern, stat) in zip(di_cols, decision_items):
+            for col, (label, pattern, stat) in zip(di_cols, decision_items, strict=True):
                 col.metric(label, pattern, stat)
 
         st.markdown("### Head-to-Head Inspection")
@@ -1105,7 +1249,8 @@ with tab_release:
     with st.expander("Segment Ledger", expanded=False):
         df = segments_to_dataframe(segments)
         st.caption(
-            f"{len(df):,} active-layer segments with stable export columns for downstream QA, quoting, and traceability."
+            f"{len(df):,} active-layer segments with stable export columns "
+            "for downstream QA, quoting, and traceability."
         )
         st.dataframe(df, width="stretch")
 

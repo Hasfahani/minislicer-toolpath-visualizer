@@ -55,7 +55,19 @@ def render_toolpath_controls(
             infill_overlap = 0.0
             perimeter_speed_mult = 0.8
 
-    return locals()
+    return {
+        "perimeter_count": perimeter_count,
+        "perimeter_spacing": perimeter_spacing,
+        "infill_pattern": infill_pattern,
+        "infill_mode": infill_mode,
+        "infill_density": infill_density,
+        "infill_spacing": infill_spacing,
+        "infill_angle": infill_angle,
+        "alternate_angle": alternate_angle,
+        "infill_clearance": infill_clearance,
+        "infill_overlap": infill_overlap,
+        "perimeter_speed_mult": perimeter_speed_mult,
+    }
 
 
 def render_print_controls(default: dict[str, float | int], advanced: bool, stl_info: Any) -> dict[str, Any]:
@@ -109,7 +121,20 @@ def render_print_controls(default: dict[str, float | int], advanced: bool, stl_i
             filament_diameter = 1.75
             acceleration_mm_s2 = 500.0
 
-    return locals()
+    return {
+        "available_profiles": available_profiles,
+        "printer_profile_name": printer_profile_name,
+        "layer_number": layer_number,
+        "model_height": model_height,
+        "material_choice": material_choice,
+        "material_cost": material_cost,
+        "layer_height": layer_height,
+        "nozzle_diameter": nozzle_diameter,
+        "print_speed": print_speed,
+        "travel_speed": travel_speed,
+        "filament_diameter": filament_diameter,
+        "acceleration_mm_s2": acceleration_mm_s2,
+    }
 
 
 def render_business_controls(advanced: bool) -> dict[str, Any]:
@@ -235,7 +260,31 @@ def render_business_controls(advanced: bool) -> dict[str, Any]:
             ndt_required = True
             redesign_required = True
 
-    return locals()
+    return {
+        "job_name": job_name,
+        "customer_name": customer_name,
+        "owner_name": owner_name,
+        "job_id": job_id,
+        "batch_quantity": batch_quantity,
+        "target_unit_price": target_unit_price,
+        "application_type": application_type,
+        "conventional_route": conventional_route,
+        "urgency": urgency,
+        "qualification_level": qualification_level,
+        "material_strategy": material_strategy,
+        "quote_profile": quote_profile,
+        "machine_rate_per_h": machine_rate_per_h,
+        "labor_rate_per_h": labor_rate_per_h,
+        "setup_time_min": setup_time_min,
+        "postprocess_time_min": postprocess_time_min,
+        "scrap_allowance_pct": scrap_allowance_pct,
+        "margin_pct": margin_pct,
+        "max_lead_time_h": max_lead_time_h,
+        "finish_tolerance_mm": finish_tolerance_mm,
+        "annual_quantity": annual_quantity,
+        "ndt_required": ndt_required,
+        "redesign_required": redesign_required,
+    }
 
 
 def render_ded_controls(process_mode: str, advanced: bool) -> dict[str, Any]:
@@ -267,101 +316,125 @@ def render_ded_controls(process_mode: str, advanced: bool) -> dict[str, Any]:
     ded_torch_clearance_mm = 120.0
     ded_program_point_limit = 25000
 
-    if not ded_enabled:
-        return locals()
+    if ded_enabled:
+        with st.expander("DED / Wire-Arc Process", expanded=True):
+            ded_profile = st.segmented_control(
+                "Process preset",
+                [
+                    "Generic large-format wire DED",
+                    "High-deposition steel build",
+                    "Fine-bead repair / cladding",
+                ],
+                default="Generic large-format wire DED",
+            ) or "Generic large-format wire DED"
+            presets = {
+                "Generic large-format wire DED": {
+                    "feed": 6.0,
+                    "wire": 1.2,
+                    "current": 180.0,
+                    "voltage": 24.0,
+                    "efficiency": 88.0,
+                },
+                "High-deposition steel build": {
+                    "feed": 9.0,
+                    "wire": 1.6,
+                    "current": 260.0,
+                    "voltage": 28.0,
+                    "efficiency": 90.0,
+                },
+                "Fine-bead repair / cladding": {
+                    "feed": 3.5,
+                    "wire": 1.0,
+                    "current": 120.0,
+                    "voltage": 20.0,
+                    "efficiency": 84.0,
+                },
+            }
+            preset = presets[str(ded_profile)]
 
-    with st.expander("DED / Wire-Arc Process", expanded=True):
-        ded_profile = st.segmented_control(
-            "Process preset",
-            [
-                "Generic large-format wire DED",
-                "High-deposition steel build",
-                "Fine-bead repair / cladding",
-            ],
-            default="Generic large-format wire DED",
-        ) or "Generic large-format wire DED"
-        presets = {
-            "Generic large-format wire DED": {
-                "feed": 6.0,
-                "wire": 1.2,
-                "current": 180.0,
-                "voltage": 24.0,
-                "efficiency": 88.0,
-            },
-            "High-deposition steel build": {
-                "feed": 9.0,
-                "wire": 1.6,
-                "current": 260.0,
-                "voltage": 28.0,
-                "efficiency": 90.0,
-            },
-            "Fine-bead repair / cladding": {
-                "feed": 3.5,
-                "wire": 1.0,
-                "current": 120.0,
-                "voltage": 20.0,
-                "efficiency": 84.0,
-            },
-        }
-        preset = presets[str(ded_profile)]
+            env1, env2, env3 = st.columns(3)
+            ded_envelope_x_mm = env1.number_input("Envelope X (mm)", 50.0, value=500.0, step=50.0)
+            ded_envelope_y_mm = env2.number_input("Envelope Y (mm)", 50.0, value=500.0, step=50.0)
+            ded_envelope_z_mm = env3.number_input("Envelope Z (mm)", 50.0, value=1500.0, step=50.0)
 
-        env1, env2, env3 = st.columns(3)
-        ded_envelope_x_mm = env1.number_input("Envelope X (mm)", 50.0, value=500.0, step=50.0)
-        ded_envelope_y_mm = env2.number_input("Envelope Y (mm)", 50.0, value=500.0, step=50.0)
-        ded_envelope_z_mm = env3.number_input("Envelope Z (mm)", 50.0, value=1500.0, step=50.0)
-
-        p1, p2 = st.columns(2)
-        ded_wire_diameter_mm = p1.number_input(
-            "Wire diameter (mm)", 0.4, value=float(preset["wire"]), step=0.1,
-        )
-        ded_wire_feed_m_min = p2.number_input(
-            "Wire feed (m/min)", 0.1, value=float(preset["feed"]), step=0.25,
-        )
-
-        if advanced:
-            st.markdown("**Arc, Yield, and Lead Time**")
-            a1, a2 = st.columns(2)
-            ded_arc_current_a = a1.number_input(
-                "Arc current (A)", 1.0, value=float(preset["current"]), step=10.0,
+            p1, p2 = st.columns(2)
+            ded_wire_diameter_mm = p1.number_input(
+                "Wire diameter (mm)", 0.4, value=float(preset["wire"]), step=0.1,
             )
-            ded_arc_voltage_v = a2.number_input(
-                "Arc voltage (V)", 1.0, value=float(preset["voltage"]), step=1.0,
-            )
-            e1, e2 = st.columns(2)
-            ded_arc_efficiency_pct = e1.number_input("Arc efficiency (%)", 1.0, 100.0, 80.0, 1.0)
-            ded_deposition_efficiency_pct = e2.number_input(
-                "Deposition efficiency (%)", 1.0, 100.0,
-                float(preset["efficiency"]), 1.0,
-            )
-            u1, u2 = st.columns(2)
-            ded_robot_utilization_pct = u1.number_input("Robot utilization (%)", 1.0, 100.0, 72.0, 1.0)
-            ded_machining_allowance_pct = u2.number_input("Machining allowance (%)", 0.0, 100.0, 12.0, 1.0)
-            c1, c2 = st.columns(2)
-            ded_billet_buy_to_fly = c1.number_input("Billet buy-to-fly", 1.0, value=3.5, step=0.25)
-            ded_conventional_lead_time_weeks = c2.number_input(
-                "Conventional lead time (weeks)", 0.0, value=20.0, step=1.0,
-            )
-            ded_machine_capacity_h_week = st.number_input(
-                "Available machine hours / week", 1.0, value=80.0, step=5.0,
-            )
-            st.markdown("**Thermal and Robot Handoff**")
-            th1, th2 = st.columns(2)
-            ded_preheat_temp_c = th1.number_input("Preheat temp (C)", 0.0, value=80.0, step=10.0)
-            ded_interpass_limit_c = th2.number_input("Interpass limit (C)", 1.0, value=250.0, step=10.0)
-            th3, th4 = st.columns(2)
-            ded_cooling_rate_c_min = th3.number_input("Cooling rate (C/min)", 0.1, value=12.0, step=1.0)
-            ded_heat_retention_pct = th4.number_input("Heat retention (%)", 0.0, 100.0, 22.0, 1.0)
-            rb1, rb2 = st.columns(2)
-            ded_robot_reach_mm = rb1.number_input("Robot reach (mm)", 100.0, value=1800.0, step=100.0)
-            ded_positioner_payload_kg = rb2.number_input("Positioner payload (kg)", 1.0, value=500.0, step=25.0)
-            rb3, rb4 = st.columns(2)
-            ded_fixture_mass_kg = rb3.number_input("Fixture mass (kg)", 0.0, value=75.0, step=5.0)
-            ded_torch_clearance_mm = rb4.number_input("Torch clearance (mm)", 0.0, value=120.0, step=10.0)
-            ded_program_point_limit = st.number_input(
-                "Robot program point limit", min_value=1000, value=25000, step=1000,
+            ded_wire_feed_m_min = p2.number_input(
+                "Wire feed (m/min)", 0.1, value=float(preset["feed"]), step=0.25,
             )
 
-    return locals()
+            if advanced:
+                st.markdown("**Arc, Yield, and Lead Time**")
+                a1, a2 = st.columns(2)
+                ded_arc_current_a = a1.number_input(
+                    "Arc current (A)", 1.0, value=float(preset["current"]), step=10.0,
+                )
+                ded_arc_voltage_v = a2.number_input(
+                    "Arc voltage (V)", 1.0, value=float(preset["voltage"]), step=1.0,
+                )
+                e1, e2 = st.columns(2)
+                ded_arc_efficiency_pct = e1.number_input("Arc efficiency (%)", 1.0, 100.0, 80.0, 1.0)
+                ded_deposition_efficiency_pct = e2.number_input(
+                    "Deposition efficiency (%)", 1.0, 100.0,
+                    float(preset["efficiency"]), 1.0,
+                )
+                u1, u2 = st.columns(2)
+                ded_robot_utilization_pct = u1.number_input("Robot utilization (%)", 1.0, 100.0, 72.0, 1.0)
+                ded_machining_allowance_pct = u2.number_input("Machining allowance (%)", 0.0, 100.0, 12.0, 1.0)
+                c1, c2 = st.columns(2)
+                ded_billet_buy_to_fly = c1.number_input("Billet buy-to-fly", 1.0, value=3.5, step=0.25)
+                ded_conventional_lead_time_weeks = c2.number_input(
+                    "Conventional lead time (weeks)", 0.0, value=20.0, step=1.0,
+                )
+                ded_machine_capacity_h_week = st.number_input(
+                    "Available machine hours / week", 1.0, value=80.0, step=5.0,
+                )
+                st.markdown("**Thermal and Robot Handoff**")
+                th1, th2 = st.columns(2)
+                ded_preheat_temp_c = th1.number_input("Preheat temp (C)", 0.0, value=80.0, step=10.0)
+                ded_interpass_limit_c = th2.number_input("Interpass limit (C)", 1.0, value=250.0, step=10.0)
+                th3, th4 = st.columns(2)
+                ded_cooling_rate_c_min = th3.number_input("Cooling rate (C/min)", 0.1, value=12.0, step=1.0)
+                ded_heat_retention_pct = th4.number_input("Heat retention (%)", 0.0, 100.0, 22.0, 1.0)
+                rb1, rb2 = st.columns(2)
+                ded_robot_reach_mm = rb1.number_input("Robot reach (mm)", 100.0, value=1800.0, step=100.0)
+                ded_positioner_payload_kg = rb2.number_input("Positioner payload (kg)", 1.0, value=500.0, step=25.0)
+                rb3, rb4 = st.columns(2)
+                ded_fixture_mass_kg = rb3.number_input("Fixture mass (kg)", 0.0, value=75.0, step=5.0)
+                ded_torch_clearance_mm = rb4.number_input("Torch clearance (mm)", 0.0, value=120.0, step=10.0)
+                ded_program_point_limit = st.number_input(
+                    "Robot program point limit", min_value=1000, value=25000, step=1000,
+                )
+
+    return {
+        "ded_enabled": ded_enabled,
+        "ded_profile": ded_profile,
+        "ded_envelope_x_mm": ded_envelope_x_mm,
+        "ded_envelope_y_mm": ded_envelope_y_mm,
+        "ded_envelope_z_mm": ded_envelope_z_mm,
+        "ded_wire_diameter_mm": ded_wire_diameter_mm,
+        "ded_wire_feed_m_min": ded_wire_feed_m_min,
+        "ded_arc_current_a": ded_arc_current_a,
+        "ded_arc_voltage_v": ded_arc_voltage_v,
+        "ded_arc_efficiency_pct": ded_arc_efficiency_pct,
+        "ded_deposition_efficiency_pct": ded_deposition_efficiency_pct,
+        "ded_robot_utilization_pct": ded_robot_utilization_pct,
+        "ded_machining_allowance_pct": ded_machining_allowance_pct,
+        "ded_billet_buy_to_fly": ded_billet_buy_to_fly,
+        "ded_conventional_lead_time_weeks": ded_conventional_lead_time_weeks,
+        "ded_machine_capacity_h_week": ded_machine_capacity_h_week,
+        "ded_preheat_temp_c": ded_preheat_temp_c,
+        "ded_interpass_limit_c": ded_interpass_limit_c,
+        "ded_cooling_rate_c_min": ded_cooling_rate_c_min,
+        "ded_heat_retention_pct": ded_heat_retention_pct,
+        "ded_robot_reach_mm": ded_robot_reach_mm,
+        "ded_positioner_payload_kg": ded_positioner_payload_kg,
+        "ded_fixture_mass_kg": ded_fixture_mass_kg,
+        "ded_torch_clearance_mm": ded_torch_clearance_mm,
+        "ded_program_point_limit": ded_program_point_limit,
+    }
 
 
 def render_placement_controls(quick_plate: str, advanced: bool) -> dict[str, Any]:
@@ -396,7 +469,20 @@ def render_placement_controls(quick_plate: str, advanced: bool) -> dict[str, Any
             translate_x = 0.0
             translate_y = 0.0
 
-    return locals()
+    return {
+        "show_plate": show_plate,
+        "scale_pct": scale_pct,
+        "rotate_deg": rotate_deg,
+        "center_on_plate": center_on_plate,
+        "fit_to_plate": fit_to_plate,
+        "plate_margin": plate_margin,
+        "plate_w": plate_w,
+        "plate_d": plate_d,
+        "mirror_x": mirror_x,
+        "mirror_y": mirror_y,
+        "translate_x": translate_x,
+        "translate_y": translate_y,
+    }
 
 
 def render_preview_controls(advanced: bool) -> dict[str, Any]:
@@ -440,4 +526,24 @@ def render_preview_controls(advanced: bool) -> dict[str, Any]:
         include_e = False
         extrusion_per_mm = 0.04
 
-    return locals()
+    return {
+        "color_scheme": color_scheme,
+        "line_width_scale": line_width_scale,
+        "show_boundary": show_boundary,
+        "show_perimeters": show_perimeters,
+        "show_infill": show_infill,
+        "show_dimensions": show_dimensions,
+        "show_travel": show_travel,
+        "show_seams": show_seams,
+        "show_start_end": show_start_end,
+        "show_arrows": show_arrows,
+        "show_extrusion": show_extrusion,
+        "optimize_perimeters": optimize_perimeters,
+        "optimize_infill": optimize_infill,
+        "reverse_lines": reverse_lines,
+        "simplify_tolerance": simplify_tolerance,
+        "min_segment_length": min_segment_length,
+        "z_hop": z_hop,
+        "extrusion_per_mm": extrusion_per_mm,
+        "include_e": include_e,
+    }

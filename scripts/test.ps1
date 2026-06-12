@@ -5,4 +5,12 @@ if (-not (Test-Path ".venv")) {
 }
 
 & .\.venv\Scripts\Activate.ps1
+
+Write-Host "[MiniSlicer] Linting (ruff)..." -ForegroundColor Cyan
+python -m ruff check .
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Lint failed."
+}
+
+Write-Host "[MiniSlicer] Running tests (pytest)..." -ForegroundColor Cyan
 python -m pytest -q

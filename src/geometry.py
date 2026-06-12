@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from typing import NamedTuple
 
-import math
-
 from shapely.geometry import MultiPolygon, Point, Polygon
-
 
 # -- Public types --------------------------------------------------------------
 

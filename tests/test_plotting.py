@@ -22,7 +22,6 @@ from src.toolpaths import (
     generate_parallel_infill,
 )
 
-
 # -- Helpers -------------------------------------------------------------------
 
 def _rect_paths():

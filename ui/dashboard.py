@@ -53,7 +53,10 @@ def render_launch_ribbon(
                 {_pill(f"Launch {launch_score}/100", _tone_for_status(readiness.get("status", "")))}
                 {_pill(f"Readiness {readiness.get('status', 'Review')}", _tone_for_status(readiness.get("status", "")))}
                 {_pill(f"Risk {program_risk}", _tone_for_status(program_risk))}
-                {_pill(f"Commercial {commercial_fit.get('status', 'Review')}", _tone_for_status(commercial_fit.get("status", "")))}
+                {_pill(
+                    f"Commercial {commercial_fit.get('status', 'Review')}",
+                    _tone_for_status(commercial_fit.get("status", "")),
+                )}
             </div>
             <div class="launch-money">
                 <span>Unit quote</span>
@@ -255,7 +258,7 @@ def render_release_gate_matrix(
         },
     ]
     columns = st.columns(len(gates))
-    for column, gate in zip(columns, gates):
+    for column, gate in zip(columns, gates, strict=True):
         with column.container(border=True):
             st.caption(str(gate["gate"]).upper())
             st.metric(str(gate["state"]), str(gate["signal"]))
@@ -521,7 +524,10 @@ def render_production_handoff_panel(
                     {"metric": "Reach required", "value": f"{float(robot_handoff['reach_required_mm']):.0f} mm"},
                     {"metric": "Reach utilization", "value": f"{float(robot_handoff['reach_utilization_pct']):.1f}%"},
                     {"metric": "Payload required", "value": f"{float(robot_handoff['payload_required_kg']):.1f} kg"},
-                    {"metric": "Payload utilization", "value": f"{float(robot_handoff['payload_utilization_pct']):.1f}%"},
+                    {
+                        "metric": "Payload utilization",
+                        "value": f"{float(robot_handoff['payload_utilization_pct']):.1f}%",
+                    },
                     {"metric": "Program points", "value": f"{int(robot_handoff['program_points']):,}"},
                 ],
                 hide_index=True,

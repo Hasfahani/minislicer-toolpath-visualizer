@@ -439,7 +439,10 @@ def create_speed_map_figure(
         ))
 
     fig.update_layout(
-        title=f"Speed Map - Perimeter: {perim_speed:.0f} mm/s ({perimeter_speed_multiplier:.0%}) | Infill: {print_speed_mm_s:.0f} | Travel: {travel_speed_mm_s:.0f} mm/s",
+        title=(
+            f"Speed Map - Perimeter: {perim_speed:.0f} mm/s ({perimeter_speed_multiplier:.0%}) "
+            f"| Infill: {print_speed_mm_s:.0f} | Travel: {travel_speed_mm_s:.0f} mm/s"
+        ),
         xaxis_title="X (mm)", yaxis_title="Y (mm)", template="plotly_white",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.0),
         margin=dict(l=24, r=24, t=70, b=24), hovermode="closest",
@@ -492,11 +495,11 @@ def create_time_map_figure(
         bucket_labels = ["shortest (fast)", "short", "medium", "long", "longest (slow)"]
         n = len(bucket_colors)
         buckets: list[list[LineString]] = [[] for _ in range(n)]
-        for line, length in zip(infill_lines, lengths):
+        for line, length in zip(infill_lines, lengths, strict=True):
             b = min(int((length - min_l) / span * n), n - 1)
             buckets[b].append(line)
 
-        for b_idx, (b_lines, color, label) in enumerate(zip(buckets, bucket_colors, bucket_labels)):
+        for b_lines, color, label in zip(buckets, bucket_colors, bucket_labels, strict=True):
             if not b_lines:
                 continue
             xs: list[float | None] = []
@@ -505,7 +508,7 @@ def create_time_map_figure(
                 lx, ly = line.xy
                 xs.extend(list(lx) + [None])
                 ys.extend(list(ly) + [None])
-            avg_t = sum(l.length for l in b_lines) / len(b_lines) / max(print_speed_mm_s, 0.1)
+            avg_t = sum(seg.length for seg in b_lines) / len(b_lines) / max(print_speed_mm_s, 0.1)
             fig.add_trace(go.Scatter(
                 x=xs, y=ys, mode="lines",
                 name=f"Infill {label} (~{avg_t * 1000:.0f} ms avg)",

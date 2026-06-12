@@ -10,8 +10,8 @@ from src.geometry import (
     bounding_box,
     bounding_box_dimensions,
     create_circle,
-    create_regular_polygon,
     create_rectangle,
+    create_regular_polygon,
     create_rounded_rectangle,
     create_star,
     create_triangle,
@@ -20,7 +20,6 @@ from src.geometry import (
     polygon_centroid,
     validate_polygon,
 )
-
 
 # -- Shape creation ------------------------------------------------------------
 

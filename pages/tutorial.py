@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import streamlit as st
 
-
 st.set_page_config(
     page_title="MiniSlicer - Advanced Guide",
     layout="wide",
@@ -418,12 +417,14 @@ st.header("Experiments That Teach Something", anchor="experiments")
 experiments = [
     (
         "Pattern efficiency shootout",
-        "Rectangle 80 x 50 mm, 3 perimeters, 3 mm spacing. Compare Parallel, Zigzag, Grid, Honeycomb, and Concentric. Record path efficiency and travel share.",
+        "Rectangle 80 x 50 mm, 3 perimeters, 3 mm spacing. Compare Parallel, Zigzag, Grid, "
+        "Honeycomb, and Concentric. Record path efficiency and travel share.",
         "Which pattern gives the least travel for the same spacing?",
     ),
     (
         "Shell versus fill budget",
-        "Keep spacing fixed at 3 mm. Sweep perimeters from 1 to 5. Watch path length, material, and density near the wall.",
+        "Keep spacing fixed at 3 mm. Sweep perimeters from 1 to 5. "
+        "Watch path length, material, and density near the wall.",
         "At what point do perimeters dominate the layer?",
     ),
     (
@@ -492,7 +493,8 @@ for item in audit_items:
     st.checkbox(item, value=False)
 
 st.warning(
-    "MiniSlicer is still a planning and education tool. Treat every export as something to inspect, not something to blindly run."
+    "MiniSlicer is still a planning and education tool. "
+    "Treat every export as something to inspect, not something to blindly run."
 )
 
 st.divider()

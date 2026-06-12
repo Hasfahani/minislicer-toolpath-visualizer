@@ -45,7 +45,7 @@ def test_csv_export_row_count_matches_segments() -> None:
     segs = _sample_segments()
     csv_text = export_segments_csv(segs)
     # Header + one row per segment
-    lines = [l for l in csv_text.splitlines() if l.strip()]
+    lines = [row for row in csv_text.splitlines() if row.strip()]
     assert len(lines) == len(segs) + 1
 
 

@@ -30,15 +30,20 @@ The current pytest suite validates:
 - the default Streamlit app shell
 - repository text quality checks
 
+The Streamlit smoke tests render the real app in default, Advanced-controls,
+and Metal-process modes, which locks the settings contract between the sidebar
+control modules and the application script.
+
 Run the suite with:
 
 ```powershell
 .\scripts\test.ps1
 ```
 
-or directly:
+This lints with ruff first, then runs pytest. Or run the steps directly:
 
 ```powershell
+python -m ruff check .
 python -m pytest -q
 ```
 

@@ -6,7 +6,6 @@ from src.geometry import create_circle, create_rectangle
 from src.metrics import summarize_metrics, total_path_length
 from src.plotting import shape_boundary
 from src.toolpaths import (
-    Segment,
     build_ordered_segments,
     filter_short_lines,
     generate_inward_perimeters,
@@ -182,8 +181,8 @@ def test_alternating_angle_produces_different_infill() -> None:
     assert len(infill_45) > 0
     assert len(infill_neg45) > 0
     # Verify they are not identical
-    coords_45 = [list(l.coords) for l in infill_45]
-    coords_neg45 = [list(l.coords) for l in infill_neg45]
+    coords_45 = [list(line.coords) for line in infill_45]
+    coords_neg45 = [list(line.coords) for line in infill_neg45]
     assert coords_45 != coords_neg45
 
 

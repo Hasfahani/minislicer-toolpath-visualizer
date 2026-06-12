@@ -79,6 +79,12 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+For development (tests + lint), install the dev dependencies instead:
+
+```powershell
+pip install -r requirements-dev.txt
+```
+
 Docker launch:
 
 ```powershell
@@ -235,11 +241,14 @@ technical readiness, program risk, and commercial fit into one executive signal.
 
 The automated test suite covers geometry helpers, toolpath generation, planner
 contracts, metrics, validation gates, exporters, job economics, STL/SVG handling,
-Plotly figure builders, the default Streamlit app shell, and text-quality checks.
+Plotly figure builders, the Streamlit app shell in default, advanced, and metal
+modes, and text-quality checks. Ruff linting runs in CI alongside the tests.
 
 ```powershell
 .\scripts\test.ps1
 ```
+
+The script lints with ruff first, then runs pytest.
 
 The tests validate software behavior and deterministic calculations. They do not
 certify machine safety, material properties, printer firmware compatibility,

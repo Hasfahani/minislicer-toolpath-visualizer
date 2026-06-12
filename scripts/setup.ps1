@@ -12,9 +12,9 @@ if (-not (Test-Path ".venv")) {
 Write-Host "[MiniSlicer] Activating virtual environment..." -ForegroundColor Cyan
 & .\.venv\Scripts\Activate.ps1
 
-Write-Host "[MiniSlicer] Installing dependencies..." -ForegroundColor Cyan
+Write-Host "[MiniSlicer] Installing dependencies (runtime + dev tools)..." -ForegroundColor Cyan
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 
 Write-Host "[MiniSlicer] Setup complete." -ForegroundColor Green
 Write-Host "Run .\\scripts\\run.ps1 to start the app." -ForegroundColor Green

@@ -137,7 +137,7 @@ def render_export_panel(
     st.download_button(
         "Production G-code",
         production_gcode,
-        f"toolpaths_full_build_production.gcode",
+        "toolpaths_full_build_production.gcode",
         "text/plain",
         width="stretch",
         disabled=not production_allowed,

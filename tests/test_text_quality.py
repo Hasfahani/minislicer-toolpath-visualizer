@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 TEXT_EXTENSIONS = {".md", ".py", ".txt"}
 SKIPPED_PARTS = {".git", ".pytest_cache", ".venv", "__pycache__"}
 MOJIBAKE_MARKERS = ("\u00c3", "\u00c2", "\u00e2")

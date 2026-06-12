@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 
 import pytest
-from shapely.geometry import LineString
 
 from src.geometry import create_circle, create_rectangle
 from src.metrics import (
@@ -22,7 +21,6 @@ from src.toolpaths import (
     generate_inward_perimeters,
     generate_parallel_infill,
 )
-
 
 # -- Fixtures ------------------------------------------------------------------
 

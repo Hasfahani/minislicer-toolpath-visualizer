@@ -22,14 +22,21 @@ def render_import_controls() -> dict[str, Any]:
     stl_slice_z = 0.0
 
     with st.expander("Import", expanded=False):
-        uploaded_config = st.file_uploader("Load JSON config", type=["json"])
+        uploaded_config = st.file_uploader("Review JSON export", type=["json"])
         if uploaded_config is not None:
             try:
                 imported = json.loads(uploaded_config.read().decode("utf-8"))
                 imported_config = imported.get("parameters", {}) if isinstance(imported, dict) else {}
-                st.success("Config loaded.")
+                if imported_config:
+                    st.json(imported_config, expanded=False)
+                    st.caption(
+                        "Parameters shown for side-by-side review. "
+                        "Automatic re-apply to the controls is on the roadmap."
+                    )
+                else:
+                    st.warning("No 'parameters' section found in this JSON export.")
             except Exception as exc:  # noqa: BLE001
-                st.warning(f"Could not load config: {exc}")
+                st.warning(f"Could not read config: {exc}")
 
         st.markdown("---")
         uploaded_svg = st.file_uploader("Import SVG shape", type=["svg"])
