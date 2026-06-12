@@ -217,21 +217,6 @@ def app_css() -> None:
         .exec-text-warn { color: var(--ms-amber); }
         .exec-text-bad { color: var(--ms-red); }
         .exec-text-neutral { color: var(--ms-ink); }
-        .gate-grid {
-            display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.65rem;
-            margin: 0.2rem 0 1rem;
-        }
-        .gate-card {
-            background: #ffffff; border: 1px solid var(--ms-line); border-radius: 8px;
-            padding: 0.78rem 0.82rem; min-height: 5.3rem; box-shadow: 0 10px 22px rgba(23, 32, 51, 0.05);
-        }
-        .gate-ok { border-top: 3px solid var(--ms-green); }
-        .gate-warn { border-top: 3px solid var(--ms-amber); }
-        .gate-bad { border-top: 3px solid var(--ms-red); }
-        .gate-neutral { border-top: 3px solid var(--ms-blue); }
-        .gate-top { color: var(--ms-muted); font-size: 0.72rem; font-weight: 760; text-transform: uppercase; }
-        .gate-state { color: var(--ms-ink); font-size: 1rem; font-weight: 780; margin-top: 0.25rem; }
-        .gate-signal { color: var(--ms-muted); font-size: 0.76rem; margin-top: 0.2rem; line-height: 1.25; }
         .quality-hero {
             display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center;
             background: #ffffff; border: 1px solid var(--ms-line); border-left: 4px solid var(--ms-blue);
@@ -271,23 +256,6 @@ def app_css() -> None:
         .pattern-note { color: var(--ms-muted); font-size: 0.8rem; margin-top: 0.2rem; }
         .pattern-score { color: var(--ms-teal); font-size: 2rem; font-weight: 820; line-height: 1; text-align: right; }
         .pattern-score span { color: var(--ms-muted); font-size: 0.78rem; font-weight: 680; }
-        .optimizer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
-        .optimizer-card {
-            background: #ffffff; border: 1px solid var(--ms-line); border-left: 4px solid var(--ms-blue);
-            border-radius: 8px; padding: 0.78rem 0.85rem; min-height: 9.1rem;
-            box-shadow: 0 10px 22px rgba(23, 32, 51, 0.045);
-        }
-        .optimizer-ok { border-left-color: var(--ms-green); }
-        .optimizer-warn { border-left-color: var(--ms-amber); }
-        .optimizer-bad { border-left-color: var(--ms-red); }
-        .optimizer-neutral { border-left-color: var(--ms-blue); }
-        .optimizer-top { display: flex; justify-content: space-between; gap: 0.55rem; align-items: center; }
-        .optimizer-top span { color: var(--ms-ink); font-size: 0.72rem; font-weight: 780; text-transform: uppercase; }
-        .optimizer-top small { color: var(--ms-muted); font-size: 0.72rem; font-weight: 680; }
-        .optimizer-title { color: var(--ms-ink); font-size: 0.94rem; font-weight: 780; line-height: 1.2; margin-top: 0.38rem; }
-        .optimizer-action { color: var(--ms-ink); font-size: 0.8rem; line-height: 1.3; margin-top: 0.28rem; }
-        .optimizer-impact { color: var(--ms-muted); font-size: 0.76rem; line-height: 1.25; margin-top: 0.24rem; }
-        .optimizer-owner { color: var(--ms-muted); font-size: 0.7rem; font-weight: 720; text-transform: uppercase; margin-top: 0.42rem; }
         .export-package {
             display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.75rem; align-items: center;
             background: #ffffff; border: 1px solid var(--ms-line); border-radius: 8px;
@@ -301,15 +269,13 @@ def app_css() -> None:
         .export-stat strong { color: var(--ms-ink); font-size: 1.12rem; line-height: 1.2; }
         @media (max-width: 980px) {
             .exec-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .gate-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .quality-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .optimizer-grid { grid-template-columns: 1fr; }
             .launch-ribbon { grid-template-columns: 1fr; }
             .launch-pills { justify-content: flex-start; }
             .launch-money { text-align: left; }
         }
         @media (max-width: 640px) {
-            .exec-strip, .exec-hero, .gate-grid, .quality-grid, .quality-hero, .pattern-winner, .export-package { grid-template-columns: 1fr; }
+            .exec-strip, .exec-hero, .quality-grid, .quality-hero, .pattern-winner, .export-package { grid-template-columns: 1fr; }
             .exec-score { text-align: left; }
             .quality-total, .pattern-score, .export-stat { text-align: left; }
             .export-stat { border-left: 0; border-top: 1px solid var(--ms-line); padding: 0.65rem 0 0; }

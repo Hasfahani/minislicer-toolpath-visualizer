@@ -47,6 +47,8 @@ def estimate_job_economics(
     )
     labor_cost = setup_labor_cost + postprocess_labor_cost
     scrap_multiplier = 1.0 + max(float(scrap_allowance_pct), 0.0) / 100.0
+    # Setup labor is a batch-level cost; material, machine time, and
+    # postprocess labor scale per part before scrap and margin are applied.
     variable_unit_cost = material_cost + machine_cost + postprocess_labor_cost
     batch_subtotal_before_scrap = variable_unit_cost * quantity + setup_labor_cost
     subtotal = batch_subtotal_before_scrap * scrap_multiplier
@@ -614,6 +616,7 @@ def estimate_ded_process(
 
     wire_area_mm2 = math.pi * (max(float(wire_diameter_mm), 0.001) / 2.0) ** 2
     wire_feed_mm_s = max(float(wire_feed_m_min), 0.0) * 1000.0 / 60.0
+    # Unit bridge: mm3/s * g/cm3 equals 0.001 g/s, then * 3600 / 1000 -> kg/h.
     wire_volume_mm3_s = wire_area_mm2 * wire_feed_mm_s
     wire_mass_kg_h = wire_volume_mm3_s * density * 0.0036
     deposited_kg_h = wire_mass_kg_h * deposition_eff

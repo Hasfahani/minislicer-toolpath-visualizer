@@ -1,13 +1,40 @@
 # MiniSlicer Toolpath Planner
 
-MiniSlicer is a Streamlit-based additive manufacturing planning workbench for
-visualizing 2D slicer logic, comparing infill strategies, reviewing print
-readiness, and exporting traceable planning packages.
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-pytest%20%2B%20GitHub%20Actions-2E7D32)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
-It is designed for engineering demos, startup prototyping workflows, quoting
-discussions, and technical portfolio review. Production G-code export is guarded
-by readiness checks and machine bounds, but every job must still be validated on
-the target machine before release.
+MiniSlicer is a Streamlit-based additive manufacturing planning workbench for
+exploring 2D slicer logic, comparing infill strategies, reviewing print
+readiness, estimating time/material/cost, and exporting traceable planning
+packages.
+
+The project is designed as an engineering portfolio and startup-demo prototype:
+it connects geometry processing, deterministic toolpath planning,
+manufacturability checks, cost-stack modeling, and neutral metal DED/WAAM
+feasibility review in one interactive app. It is intentionally honest about its
+scope: MiniSlicer is a planning and visualization tool, not a certified
+production slicer.
+
+Production FDM G-code export is guarded by readiness checks and machine bounds,
+but every job must still be validated on the target machine before release.
+
+## Demo Preview
+
+Representative screenshots captured from the live Streamlit app:
+
+| Design workspace | Release dashboard |
+|---|---|
+| ![Design workspace](docs/images/design-workspace.png) | ![Release dashboard](docs/images/release-dashboard.png) |
+
+| Pattern comparison | DED process model |
+|---|---|
+| ![Pattern comparison](docs/images/pattern-comparison.png) | ![DED process model](docs/images/ded-process-model.png) |
+
+| Export package |
+|---|
+| ![Export package](docs/images/export-package.png) |
 
 ## Product Capabilities
 
@@ -22,7 +49,7 @@ the target machine before release.
 | Commercial Controls | Customer/job metadata, application type, conventional route, urgency, qualification level, material strategy, batch quantity, target price, machine rate, labor rate, setup time, postprocess time, scrap, margin, conventional lead time, and machine-capacity guardrails |
 | Visualization | Toolpath, extrusion-width, speed map, time map, density map, animation, and 3D layer stack views |
 | Export | CSV, JSON, SVG, preview G-code, guarded FDM production G-code, markdown dossier, HTML dossier, and text report |
-| Reproducibility | JSON parameter snapshots can be re-imported to recreate prior planning runs |
+| Traceability | JSON exports include active parameters and segment data; planning packages receive deterministic fingerprints |
 
 ## Quick Start
 
@@ -43,10 +70,6 @@ Run the test suite:
 .\scripts\test.ps1
 ```
 
-The suite covers backend geometry/toolpath behavior, exports, job economics,
-STL/SVG handling, the default Streamlit app shell, and repository text quality
-so demo-facing screens stay free of encoding artifacts.
-
 Manual launch:
 
 ```powershell
@@ -55,6 +78,34 @@ python -m venv .venv
 pip install -r requirements.txt
 streamlit run app.py
 ```
+
+Docker launch:
+
+```powershell
+docker compose up --build
+```
+
+Then open:
+
+```text
+http://localhost:8501
+```
+
+## Example Use Cases
+
+- Demonstrate slicer fundamentals in a manufacturing, robotics, or CAD/CAM
+  course.
+- Compare infill strategies for path length, travel share, time, and material
+  impact.
+- Review whether an imported SVG or STL cross-section is reasonable before
+  deeper process planning.
+- Produce a traceable planning packet for an early-stage customer or internal
+  design review.
+- Explore how process assumptions affect FDM quote estimates and launch
+  readiness.
+- Present a neutral DED/WAAM feasibility screen covering envelope fit, wire
+  demand, energy, interpass risk, robot reach, payload, and qualification
+  burden.
 
 ## Workflow
 
@@ -65,17 +116,68 @@ streamlit run app.py
    appearance.
 4. Set job metadata, batch quantity, quote assumptions, target price, and
    machine-time guardrails in Business / Launch.
-5. Review the Executive, Quality, and Advisor tabs before exporting.
+5. Review the Executive, Quality Scorecard, and Advisor sections in the Release
+   tab before exporting.
 6. In Metal mode, review the DED process model for envelope fit, wire demand,
    heat input, energy, material savings, and lead-time compression.
 7. Review Manufacturing Partner Fit for DfAM suitability, route comparison,
-   qualification burden, service deliverables, and value versus conventional sourcing.
+   qualification burden, service deliverables, and value versus conventional
+   sourcing.
 8. Review Production Handoff for thermal/interpass controls, robot reach and
-   payload feasibility, program size, coupons, inspections, and traceability records.
-9. Use the Launch Optimizer to review top moves, what-if levers, batch scenarios, and release checklist status.
+   payload feasibility, program size, coupons, inspections, and traceability
+   records.
+9. Use the Launch Optimizer to review top moves, what-if levers, batch
+   scenarios, and release checklist status.
 10. Export a dossier for sign-off, plus data files for engineering traceability.
 11. Use production G-code only when readiness is unblocked, process mode is FDM,
-   and the selected machine profile matches the physical printer.
+    and the selected machine profile matches the physical printer.
+
+## Portfolio Framing
+
+MiniSlicer is technically valuable because it turns several manufacturing
+engineering concerns into a coherent software system:
+
+- Geometry processing: Shapely offsets, clipping, polygon validation, SVG
+  parsing, and STL cross-section slicing.
+- Toolpath planning: perimeters, multiple infill families, path ordering,
+  layer-aware planning, full-build segment generation, and pattern ranking.
+- Determinism: stable plan fingerprints connect geometry, settings, process,
+  material, and layer count for repeatable review.
+- Time and material estimation: acceleration-aware motion timing and bead-volume
+  approximations provide more realistic planning signals than length-only
+  estimates.
+- Readiness checks: the app flags build-plate fit, missing paths, excessive
+  layer height, sparse infill, travel-heavy plans, volumetric-flow risk, tall
+  builds, and metal-process release concerns.
+- Business modeling: transparent quote, cost-stack, productivity, batch, and
+  launch-score calculations connect engineering choices to commercial outcomes.
+- Metal DED review: neutral WAAM/DED assumptions estimate wire demand, heat
+  input, deposited mass, energy intensity, envelope utilization, robot-cell
+  feasibility, and qualification evidence.
+- Traceable exports: CSV, JSON, SVG, preview G-code, guarded FDM production
+  G-code, markdown dossiers, HTML dossiers, and text reports support review
+  handoff without claiming machine certification.
+
+## Quick Architecture
+
+```text
+Streamlit UI (app.py, ui/)
+  -> geometry/import layer (src/geometry.py, src/svg_import.py, src/stl_import.py)
+  -> planner/toolpaths (src/planner.py, src/toolpaths.py)
+  -> metrics and analysis (src/metrics.py, src/job_analysis.py)
+  -> validation gates (src/validation.py)
+  -> visualization/export (src/plotting.py, src/animation.py, src/exporters.py)
+```
+
+The Streamlit interface collects process, geometry, business, and export
+settings. Geometry helpers normalize built-in shapes, SVG outlines, and STL
+cross-sections into Shapely polygons. The planner converts validated settings
+into per-layer or full-build segments. Metrics and job-analysis modules estimate
+time, material, cost, productivity, DED feasibility, and release readiness.
+Validation turns those results into user-facing blockers and warnings.
+Exporters package the selected layer or full build for engineering review.
+
+See [docs/architecture.md](docs/architecture.md) for a deeper module map.
 
 ## Engineering Model
 
@@ -129,6 +231,67 @@ Commercial fit compares the calculated unit quote and batch machine hours
 against the target price and lead-time guardrails. The launch score combines
 technical readiness, program risk, and commercial fit into one executive signal.
 
+## Engineering Validation
+
+The automated test suite covers geometry helpers, toolpath generation, planner
+contracts, metrics, validation gates, exporters, job economics, STL/SVG handling,
+Plotly figure builders, the default Streamlit app shell, and text-quality checks.
+
+```powershell
+.\scripts\test.ps1
+```
+
+The tests validate software behavior and deterministic calculations. They do not
+certify machine safety, material properties, printer firmware compatibility,
+robot collision avoidance, metallurgy, or production readiness. Real deployment
+still requires printer-specific slicing review, dry runs, fixturing checks,
+material/process qualification, and sign-off by qualified manufacturing
+engineers.
+
+See [docs/validation.md](docs/validation.md) for details.
+
+## Example Data
+
+The repository includes small, reviewable example assets under `examples/`:
+
+- `sample-bracket.svg`
+- `demo-fdm-job.json`
+- `demo-ded-job.json`
+- `sample-job-dossier.md`
+- `sample-job-dossier.html`
+
+See [examples/README.md](examples/README.md). Large binary fixtures are
+intentionally not included.
+
+## Limitations
+
+- This is not a certified production slicer.
+- STL handling is focused on horizontal cross-section studies, not robust repair
+  of arbitrary non-manifold meshes.
+- SVG parsing supports practical closed outlines but is not a full SVG renderer.
+- The DED/WAAM model is a neutral feasibility approximation, not a calibrated
+  process recipe.
+- Preview G-code is educational. Production G-code export is guarded and FDM
+  only, and still requires machine validation.
+- Collision checking, thermal simulation, support generation, path pressure
+  advance, firmware-specific tuning, and closed-loop process control are out of
+  scope today.
+
+See [docs/limitations.md](docs/limitations.md) for the fuller list.
+
+## Roadmap
+
+- Improve JSON config round-tripping so exported parameters can repopulate UI
+  controls.
+- Add richer example STL fixtures with clear licenses and small file sizes.
+- Add richer STL diagnostics for scale, units, watertightness, and slice quality.
+- Add more machine profiles and explicit profile provenance notes.
+- Expand production G-code safeguards with preview simulation and printer-family
+  compatibility checks.
+- Add optional report templates for recruiting demos, university reviews, and
+  customer-facing feasibility studies.
+- Add benchmark fixtures for large geometries and dense infill patterns.
+
 ## Project Structure
 
 ```text
@@ -146,11 +309,18 @@ src/plotting.py         Plotly 2D/3D visualization builders
 src/stl_import.py       STL metadata and cross-section slicing
 src/svg_import.py       SVG outline parsing
 ui/                     Streamlit controls and panels
+pages/tutorial.py       Built-in guide and teaching workflow
+docs/                   Architecture, validation, limitations, and demo notes
+examples/               Small SVG, JSON, and dossier demo assets
 tests/                  Pytest coverage plus Streamlit smoke and text-quality checks
 ```
 
 ## Safety Note
 
-This is a planning and visualization tool. It does not replace a qualified
+MiniSlicer is a planning and visualization tool. It does not replace a qualified
 manufacturing engineer, printer-specific slicer validation, material process
 qualification, fixture review, collision checking, or machine commissioning.
+
+## License
+
+This project is released under the [MIT License](LICENSE).

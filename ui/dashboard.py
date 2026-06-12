@@ -254,17 +254,11 @@ def render_release_gate_matrix(
             "tone": "ok" if launch_score >= 85 else "warn" if launch_score >= 65 else "bad",
         },
     ]
-    cards = "\n".join(
-        f"""
-        <div class="gate-card gate-{gate['tone']}">
-            <div class="gate-top">{escape(gate['gate'])}</div>
-            <div class="gate-state">{escape(gate['state'])}</div>
-            <div class="gate-signal">{escape(gate['signal'])}</div>
-        </div>
-        """
-        for gate in gates
-    )
-    st.markdown(f'<div class="gate-grid">{cards}</div>', unsafe_allow_html=True)
+    columns = st.columns(len(gates))
+    for column, gate in zip(columns, gates):
+        with column.container(border=True):
+            st.caption(str(gate["gate"]).upper())
+            st.metric(str(gate["state"]), str(gate["signal"]))
 
 
 def render_quality_scorecard(scorecard: dict[str, Any]) -> None:
@@ -353,22 +347,14 @@ def render_launch_optimizer(
 
     with left:
         st.markdown("#### Top Moves")
-        cards = "\n".join(
-            f"""
-            <div class="optimizer-card optimizer-{_tone_for_priority(str(row['priority']))}">
-                <div class="optimizer-top">
-                    <span>{escape(str(row['priority']))}</span>
-                    <small>{escape(str(row['area']))}</small>
-                </div>
-                <div class="optimizer-title">{escape(str(row['title']))}</div>
-                <div class="optimizer-action">{escape(str(row['action']))}</div>
-                <div class="optimizer-impact">{escape(str(row['impact']))}</div>
-                <div class="optimizer-owner">Owner: {escape(str(row['owner']))}</div>
-            </div>
-            """
-            for row in recommendations[:6]
-        )
-        st.markdown(f'<div class="optimizer-grid">{cards}</div>', unsafe_allow_html=True)
+        for row in recommendations[:6]:
+            priority = str(row["priority"])
+            with st.container(border=True):
+                st.caption(f"{priority.upper()} - {row['area']}")
+                st.markdown(f"**{row['title']}**")
+                st.write(str(row["action"]))
+                st.caption(str(row["impact"]))
+                st.caption(f"Owner: {row['owner']}")
 
     with right:
         st.markdown("#### What-If Playbook")
@@ -672,13 +658,3 @@ def _tone_for_score(score: int) -> str:
     if score >= 60:
         return "warn"
     return "bad"
-
-
-def _tone_for_priority(priority: str) -> str:
-    if priority == "Critical":
-        return "bad"
-    if priority == "High":
-        return "warn"
-    if priority == "Ready":
-        return "ok"
-    return "neutral"

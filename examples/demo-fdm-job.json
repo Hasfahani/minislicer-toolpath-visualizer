@@ -1,0 +1,47 @@
+{
+  "example_type": "MiniSlicer FDM planning packet",
+  "note": "Compact demo fixture. Generate fresh JSON from the app for formal review.",
+  "parameters": {
+    "process_mode": "FDM",
+    "shape_type": "Rectangle",
+    "infill_pattern": "zigzag",
+    "infill_spacing_mm": 4.0,
+    "perimeter_count": 3,
+    "layer_height_mm": 0.2,
+    "nozzle_diameter_mm": 0.4,
+    "material": "PLA",
+    "plan_fingerprint": "demo-fdm-0001",
+    "readiness": {
+      "status": "Ready",
+      "blockers": 0,
+      "warnings": 1
+    },
+    "production_export": {
+      "full_build_enabled": true,
+      "layer_count": 25,
+      "guarded_fdm_only": true
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "layer": 1,
+      "path_type": "perimeter",
+      "x0": 0.0,
+      "y0": 0.0,
+      "x1": 80.0,
+      "y1": 0.0,
+      "length_mm": 80.0
+    },
+    {
+      "index": 1,
+      "layer": 1,
+      "path_type": "infill",
+      "x0": 4.0,
+      "y0": 4.0,
+      "x1": 76.0,
+      "y1": 36.0,
+      "length_mm": 78.8
+    }
+  ]
+}

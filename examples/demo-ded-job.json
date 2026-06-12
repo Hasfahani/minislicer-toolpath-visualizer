@@ -1,0 +1,48 @@
+{
+  "example_type": "MiniSlicer DED/WAAM feasibility packet",
+  "note": "Compact demo fixture. Values are illustrative planning assumptions, not a qualified process recipe.",
+  "parameters": {
+    "process_mode": "Metal (LPBF/DED)",
+    "shape_type": "STL cross-section",
+    "infill_pattern": "concentric",
+    "material": "Steel 316L",
+    "plan_fingerprint": "demo-ded-0001",
+    "ded_process": {
+      "profile": "Generic large-format wire DED",
+      "wire_diameter_mm": 1.2,
+      "wire_feed_m_min": 6.0,
+      "arc_current_a": 180.0,
+      "arc_voltage_v": 24.0,
+      "deposition_efficiency_pct": 88.0
+    },
+    "ded_review": {
+      "envelope_fit": true,
+      "required_wire_feed_m_min": 5.4,
+      "heat_input_kj_mm": 0.07,
+      "robot_cell_status": "Review",
+      "qualification_level": "Industrial"
+    }
+  },
+  "segments": [
+    {
+      "index": 0,
+      "layer": 1,
+      "path_type": "perimeter",
+      "x0": 0.0,
+      "y0": 0.0,
+      "x1": 60.0,
+      "y1": 0.0,
+      "length_mm": 60.0
+    },
+    {
+      "index": 1,
+      "layer": 1,
+      "path_type": "infill",
+      "x0": 10.0,
+      "y0": 10.0,
+      "x1": 50.0,
+      "y1": 30.0,
+      "length_mm": 44.7
+    }
+  ]
+}

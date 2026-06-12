@@ -8,6 +8,7 @@ version = "0.2.0"
 description = "Educational 2D slicer-style toolpath visualizer built with Streamlit and Shapely"
 readme = "README.md"
 requires-python = ">=3.11"
+license = { file = "LICENSE" }
 authors = [
   { name = "MiniSlicer Maintainers" }
 ]
