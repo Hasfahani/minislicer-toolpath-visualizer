@@ -1,15 +1,17 @@
+<!-- # Purpose: Provides a short presentation script and demo flow for explaining MiniSlicer live. -->
+<!-- # Reason: A prepared script helps communicate the engineering value clearly in interviews or reviews. -->
 # 60-90 Second Demo Script
 
 ## Audience
 
-This script works for recruiters, professors, startup founders, and
+This script works for recruiters, professors, product reviewers, and
 manufacturing engineers. Adjust the emphasis based on who is watching:
 
 - Recruiters: emphasize full-stack engineering, tests, packaging, and clear
   product thinking.
 - Professors: emphasize geometry, planning assumptions, validation boundaries,
   and engineering communication.
-- Startup founders: emphasize workflow, quote signals, release readiness, and
+- Product reviewers: emphasize workflow, quote signals, release readiness, and
   customer-facing exports.
 - Manufacturing engineers: emphasize checks, limitations, DED assumptions, and
   the safety boundary.

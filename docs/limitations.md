@@ -1,6 +1,8 @@
+<!-- # Purpose: Lists the technical, manufacturing, export, and deployment limits of MiniSlicer. -->
+<!-- # Reason: Stating limitations up front keeps the project credible and prevents overclaiming. -->
 # Limitations
 
-MiniSlicer is a planning, visualization, and portfolio demonstration tool. It is
+MiniSlicer is a planning, visualization, and feasibility review tool. It is
 not a certified production slicer, CAM package, robot programmer, or process
 qualification system.
 

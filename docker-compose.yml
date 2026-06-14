@@ -1,3 +1,5 @@
+# Purpose: Defines a local Docker Compose service for running MiniSlicer on port 8501.
+# Reason: Compose gives a one-command way to build, launch, and health-check the app.
 services:
   minislicer:
     build: .

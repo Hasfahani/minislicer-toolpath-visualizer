@@ -1,3 +1,5 @@
+# Purpose: Creates the virtual environment and installs runtime plus development dependencies.
+# Reason: A repeatable setup script makes onboarding, demos, and testing easier on Windows.
 param(
     [string]$PythonExe = "python"
 )

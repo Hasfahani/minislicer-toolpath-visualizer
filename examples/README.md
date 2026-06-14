@@ -1,7 +1,9 @@
+<!-- # Purpose: Explains the small example assets included for import, export, and dossier demos. -->
+<!-- # Reason: Example documentation keeps demo fixtures understandable and avoids accidental customer data. -->
 # MiniSlicer Example Assets
 
 This folder contains small, reviewable demo assets and placeholders for future
-portfolio fixtures. Do not commit large binary fixtures unless they are truly
+project fixtures. Do not commit large binary fixtures unless they are truly
 needed and clearly licensed.
 
 ## Included Files
@@ -87,7 +89,7 @@ demo-ded-job.json
 
 ### Sample Markdown Dossier
 
-Add additional markdown dossiers exported from the app for portfolio review.
+Add additional markdown dossiers exported from the app for product or engineering review.
 
 Suggested filename:
 

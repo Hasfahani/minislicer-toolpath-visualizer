@@ -1,3 +1,5 @@
+# Purpose: Tests CSV, JSON, preview G-code, and guarded production G-code exporters.
+# Reason: Export tests protect file schemas and machine-safety guardrails from regressions.
 """Tests for src/exporters.py CSV and G-code-like exports."""
 
 import io

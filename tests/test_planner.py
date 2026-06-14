@@ -1,3 +1,5 @@
+# Purpose: Tests layer planning, production segment generation, infill ranking, and fingerprints.
+# Reason: Planner tests protect the deterministic contract between geometry, settings, and exports.
 """Tests for the MiniSlicer planning engine service."""
 
 import pytest

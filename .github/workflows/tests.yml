@@ -1,3 +1,5 @@
+# Purpose: Runs linting and pytest in GitHub Actions for pushes and pull requests.
+# Reason: CI proves the project works outside the local machine and protects future changes.
 name: Tests
 
 on:

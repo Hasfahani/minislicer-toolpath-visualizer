@@ -1,3 +1,5 @@
+<!-- # Purpose: Documents what the test suite validates and what still needs real-world manufacturing review. -->
+<!-- # Reason: Clear validation boundaries show professional engineering judgment and honest safety limits. -->
 # Engineering Validation
 
 MiniSlicer uses automated tests to validate the software model and a written
@@ -88,6 +90,6 @@ printer-specific slicing, simulation, and physical validation.
 ## DED/WAAM Boundary
 
 The metal process model is a neutral feasibility estimate. It is useful for
-portfolio demos, early customer conversations, and comparing order-of-magnitude
-process assumptions. It is not a qualified WAAM/DED procedure specification,
-metallurgical model, or robot program generator.
+internal engineering reviews, early customer conversations, and comparing
+order-of-magnitude process assumptions. It is not a qualified WAAM/DED
+procedure specification, metallurgical model, or robot program generator.

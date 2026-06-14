@@ -1,3 +1,5 @@
+# Purpose: Tests readiness scoring, blockers, warnings, and JSON-safe readiness output.
+# Reason: Validation tests ensure export gates behave consistently and explainably.
 """Tests for job readiness assessment."""
 
 from src.validation import assess_job_readiness, readiness_to_dict

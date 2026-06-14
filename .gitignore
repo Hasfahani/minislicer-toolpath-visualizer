@@ -1,3 +1,5 @@
+# Purpose: Tells Git which local, generated, cache, and environment files to ignore.
+# Reason: Keeps commits focused on source code, docs, tests, and intentional project assets.
 # Python cache
 __pycache__/
 *.py[cod]

@@ -1,3 +1,5 @@
+# Purpose: Reads STL metadata and slices meshes into horizontal 2D polygons for planning.
+# Reason: STL support lets the app review real 3D geometry while keeping the planner 2D and understandable.
 """STL import and horizontal slicing helpers."""
 
 from __future__ import annotations

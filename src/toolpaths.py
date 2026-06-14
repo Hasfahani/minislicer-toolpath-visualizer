@@ -1,3 +1,5 @@
+# Purpose: Generates perimeters, infill patterns, path ordering, simplification, and segment records.
+# Reason: Keeping raw path algorithms here makes the planner small and the geometry behavior easy to test.
 """Toolpath generation utilities for simplified 2D planning."""
 
 from __future__ import annotations

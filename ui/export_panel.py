@@ -1,3 +1,5 @@
+# Purpose: Renders download buttons, export previews, and guarded production G-code controls.
+# Reason: Export UI is isolated because it has many file types and safety states to present clearly.
 """Export buttons and previews for MiniSlicer."""
 
 from __future__ import annotations

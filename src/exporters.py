@@ -1,3 +1,5 @@
+# Purpose: Converts planned segments into CSV, JSON, SVG, preview G-code, and guarded FDM G-code.
+# Reason: Export logic is isolated so file formats and machine safety checks can be tested directly.
 """Export helpers for toolpath segments."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# Purpose: Tests economics, launch scoring, DED feasibility, handoff models, and dossier output.
+# Reason: These tests prove the business/manufacturing layer is deterministic and explainable.
 """Tests for business and manufacturability analysis."""
 
 from src.job_analysis import (

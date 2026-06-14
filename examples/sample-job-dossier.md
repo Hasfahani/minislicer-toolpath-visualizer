@@ -1,3 +1,5 @@
+<!-- # Purpose: Shows a compact example of the markdown dossier MiniSlicer can export. -->
+<!-- # Reason: A sample dossier gives interviewers a quick view of the planned handoff format. -->
 # MiniSlicer Sample Job Dossier
 
 ## Executive Summary
@@ -25,5 +27,5 @@
 
 ## Quality and Safety Boundary
 
-This sample dossier is for portfolio review only. It does not certify a printer,
+This sample dossier is for planning review only. It does not certify a printer,
 material, machine profile, or production process.

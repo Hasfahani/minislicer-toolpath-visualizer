@@ -1,3 +1,5 @@
+# Purpose: Checks repository text files for ASCII cleanliness and mojibake.
+# Reason: Text-quality tests keep README, docs, and UI copy professional for demos and interviews.
 """Repository text-quality checks for demo-facing polish."""
 
 from pathlib import Path

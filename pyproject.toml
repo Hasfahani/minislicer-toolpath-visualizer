@@ -1,3 +1,5 @@
+# Purpose: Defines Python package metadata plus pytest and ruff configuration.
+# Reason: Central project configuration keeps dependencies, tests, and lint rules consistent.
 [build-system]
 requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"

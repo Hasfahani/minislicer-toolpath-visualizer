@@ -1,3 +1,5 @@
+# Purpose: Normalizes line endings across platforms for this repository.
+# Reason: Consistent line endings reduce noisy diffs between Windows and Unix tooling.
 * text=auto eol=lf
 
 *.cmd text eol=crlf

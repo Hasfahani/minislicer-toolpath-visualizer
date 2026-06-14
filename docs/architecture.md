@@ -1,3 +1,5 @@
+<!-- # Purpose: Explains the software architecture and how app, UI, source modules, validation, and export connect. -->
+<!-- # Reason: This document helps reviewers understand the project structure without reading every file first. -->
 # MiniSlicer Architecture
 
 MiniSlicer is organized around a simple pipeline:

@@ -1,3 +1,5 @@
+# Purpose: Lists development dependencies for tests and linting.
+# Reason: Dev-only tools stay separate from runtime dependencies to keep production installs lean.
 -r requirements.txt
 pytest>=8.2.0
 ruff>=0.6.0

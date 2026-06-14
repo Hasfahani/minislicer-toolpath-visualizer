@@ -1,3 +1,5 @@
+# Purpose: Renders toolpath, print, business, DED, placement, and preview controls.
+# Reason: Process controls are grouped here to keep sidebar logic organized and reusable.
 """Process, placement, and preview controls for MiniSlicer."""
 
 from __future__ import annotations
@@ -8,6 +10,12 @@ import streamlit as st
 
 from src.metrics import MATERIAL_DENSITY
 from src.profiles import PRINTER_PROFILES, profile_names
+from src.scenarios import as_float, as_int, option_index
+
+
+def _overrides() -> dict[str, Any]:
+    """Active control overrides set by a loaded scenario or re-applied config."""
+    return st.session_state.get("_overrides", {})
 
 
 def render_toolpath_controls(
@@ -16,24 +24,42 @@ def render_toolpath_controls(
     pattern_icons: dict[str, str],
     advanced: bool,
 ) -> dict[str, Any]:
-    with st.expander("Toolpath", expanded=True):
+    ov = _overrides()
+    fill_modes = ["Spacing", "Density"]
+    with st.expander("2 - Toolpath", expanded=True, icon=":material/route:"):
         tc1, tc2 = st.columns(2)
-        perimeter_count = tc1.slider("Perimeters", 1, 10, int(default["perimeters"]))
-        perimeter_spacing = tc2.number_input("Perim. spacing (mm)", 0.1, value=1.0, step=0.1)
+        perimeter_count = tc1.slider(
+            "Perimeters", 1, 10,
+            max(1, min(10, as_int(ov.get("perimeter_count"), int(default["perimeters"])))),
+            help="Number of outline walls around the part.",
+        )
+        perimeter_spacing = tc2.number_input(
+            "Perim. spacing (mm)", 0.1, value=1.0, step=0.1,
+            help="Distance between adjacent perimeter walls.",
+        )
 
         infill_pattern = st.selectbox(
-            "Infill pattern", patterns, index=0,
+            "Infill pattern", patterns,
+            index=option_index(patterns, ov.get("infill_pattern"), 0),
             format_func=lambda p: f"{pattern_icons.get(p, '')} {p}",
+            help="Interior fill style. Compare options in the Plan tab.",
         )
 
         ic1, ic2 = st.columns([1, 2])
-        infill_mode = ic1.radio("Fill by", ["Spacing", "Density"], horizontal=False)
+        infill_mode = ic1.radio(
+            "Fill by", fill_modes, index=option_index(fill_modes, ov.get("infill_mode"), 0),
+            horizontal=False,
+            help="Spacing sets line gap directly; Density derives it from a percentage.",
+        )
         if infill_mode == "Density":
-            infill_density = ic2.slider("Density (%)", 5, 100, 25, 5)
+            infill_density = ic2.slider(
+                "Density (%)", 5, 100, max(5, min(100, as_int(ov.get("infill_density"), 25))), 5,
+            )
             infill_spacing = 3.0
         else:
             infill_spacing = ic2.number_input(
-                "Spacing (mm)", 0.1, value=float(default["spacing"]), step=0.1,
+                "Spacing (mm)", 0.1,
+                value=as_float(ov.get("infill_spacing"), float(default["spacing"])), step=0.1,
             )
             infill_density = 25
 
@@ -71,7 +97,7 @@ def render_toolpath_controls(
 
 
 def render_print_controls(default: dict[str, float | int], advanced: bool, stl_info: Any) -> dict[str, Any]:
-    with st.expander("Print Settings", expanded=False):
+    with st.expander("3 - Print settings", expanded=False, icon=":material/print:"):
         available_profiles = profile_names()
         custom_profile_name = available_profiles[0]
         printer_profile_name = st.selectbox("Printer profile", available_profiles, index=0)
@@ -84,15 +110,22 @@ def render_print_controls(default: dict[str, float | int], advanced: bool, stl_i
         prof_lh = printer_profile.layer_thickness_mm if use_profile else float(default["layer_height"])
         prof_mat = printer_profile.material if use_profile else "PLA"
 
+        ov = _overrides()
         default_model_height = float(stl_info.height) if stl_info is not None and stl_info.height > 0 else 5.0
         ps1, ps2 = st.columns(2)
-        layer_number = ps1.number_input("Layer #", min_value=1, value=1, step=1)
-        model_height = ps2.number_input("Model height (mm)", 0.05, value=default_model_height, step=0.5)
+        layer_number = ps1.number_input(
+            "Layer #", min_value=1, value=max(1, as_int(ov.get("layer_number"), 1)), step=1,
+        )
+        model_height = ps2.number_input(
+            "Model height (mm)", 0.05,
+            value=as_float(ov.get("model_height"), default_model_height), step=0.5,
+        )
 
+        material_keys = list(MATERIAL_DENSITY.keys())
+        default_material_index = material_keys.index(prof_mat) if prof_mat in material_keys else 0
         material_choice = st.selectbox(
-            "Material", list(MATERIAL_DENSITY.keys()),
-            index=list(MATERIAL_DENSITY.keys()).index(prof_mat)
-            if prof_mat in MATERIAL_DENSITY else 0,
+            "Material", material_keys,
+            index=option_index(material_keys, ov.get("material_choice"), default_material_index),
         )
         material_cost = st.number_input("Material cost ($/kg)", 0.0, value=24.0, step=1.0)
 
@@ -139,16 +172,22 @@ def render_print_controls(default: dict[str, float | int], advanced: bool, stl_i
 
 def render_business_controls(advanced: bool) -> dict[str, Any]:
     """Render launch, quoting, and customer-facing planning controls."""
-    with st.expander("Business / Launch", expanded=False):
-        job_name = st.text_input("Job name", value="MiniSlicer planning run")
+    ov = _overrides()
+    with st.expander("6 - Business / Launch", expanded=False, icon=":material/payments:"):
+        job_name = st.text_input("Job name", value=str(ov.get("job_name", "MiniSlicer planning run")))
         c1, c2 = st.columns(2)
-        customer_name = c1.text_input("Customer", value="Internal")
+        customer_name = c1.text_input("Customer", value=str(ov.get("customer_name", "Internal")))
         owner_name = c2.text_input("Owner", value="Engineering")
         job_id = st.text_input("Job ID", value="MS-PLN-001")
 
         q1, q2 = st.columns(2)
-        batch_quantity = q1.number_input("Batch qty", min_value=1, value=1, step=1)
-        target_unit_price = q2.number_input("Target $/part", min_value=0.0, value=0.0, step=5.0)
+        batch_quantity = q1.number_input(
+            "Batch qty", min_value=1, value=max(1, as_int(ov.get("batch_quantity"), 1)), step=1,
+        )
+        target_unit_price = q2.number_input(
+            "Target $/part", min_value=0.0,
+            value=max(0.0, as_float(ov.get("target_unit_price"), 0.0)), step=5.0,
+        )
 
         application_type = st.selectbox(
             "Application",
@@ -317,7 +356,7 @@ def render_ded_controls(process_mode: str, advanced: bool) -> dict[str, Any]:
     ded_program_point_limit = 25000
 
     if ded_enabled:
-        with st.expander("DED / Wire-Arc Process", expanded=True):
+        with st.expander("Metal / DED process", expanded=True, icon=":material/bolt:"):
             ded_profile = st.segmented_control(
                 "Process preset",
                 [
@@ -438,7 +477,7 @@ def render_ded_controls(process_mode: str, advanced: bool) -> dict[str, Any]:
 
 
 def render_placement_controls(quick_plate: str, advanced: bool) -> dict[str, Any]:
-    with st.expander("Placement", expanded=False):
+    with st.expander("4 - Placement", expanded=False, icon=":material/open_with:"):
         show_plate = st.checkbox("Show build plate", value=quick_plate != "None")
         plate_default = 300.0 if "300" in quick_plate else 220.0
 
@@ -486,11 +525,15 @@ def render_placement_controls(quick_plate: str, advanced: bool) -> dict[str, Any
 
 
 def render_preview_controls(advanced: bool) -> dict[str, Any]:
-    with st.expander("Preview Appearance", expanded=False):
+    with st.expander("5 - Appearance & overlays", expanded=False, icon=":material/palette:"):
         scheme_options = ["Classic", "Colorblind", "Dark", "Neon", "High Contrast"]
-        color_scheme = st.selectbox("Color scheme", scheme_options, index=0)
+        color_scheme = st.selectbox(
+            "Color scheme", scheme_options, index=0,
+            help="Palette for the toolpath preview.",
+        )
         line_width_scale = st.slider("Line thickness", 0.5, 3.0, 1.0, 0.25)
 
+        st.caption("Toggle overlays drawn on the preview:")
         pv1, pv2 = st.columns(2)
         show_boundary = pv1.checkbox("Outline", value=True)
         show_perimeters = pv1.checkbox("Perimeters", value=True)
@@ -503,7 +546,7 @@ def render_preview_controls(advanced: bool) -> dict[str, Any]:
         show_extrusion = pv2.checkbox("Extrusion width", value=False)
 
     if advanced:
-        with st.expander("Quality / Export", expanded=False):
+        with st.expander("Quality / Export", expanded=False, icon=":material/tune:"):
             optimize_perimeters = st.checkbox("Optimize perimeter order", value=False)
             optimize_infill = st.checkbox("Optimize infill order", value=True)
             reverse_lines = st.checkbox(

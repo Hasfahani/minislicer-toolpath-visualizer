@@ -1,3 +1,5 @@
+# Purpose: Builds animated Plotly previews that replay toolpath segments like a moving nozzle.
+# Reason: Animation helps explain path order and motion visually without changing backend planning logic.
 """Animated Plotly figure showing nozzle path playback segment by segment."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# Purpose: Calculates economics, launch readiness, DED feasibility, partner fit, and job dossiers.
+# Reason: Business and manufacturability analysis lives here so product decisions stay separate from UI code.
 """Business and manufacturability analysis for MiniSlicer jobs."""
 
 from __future__ import annotations

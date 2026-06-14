@@ -1,3 +1,5 @@
+# Purpose: Contains app-level helpers for formatting time, building shapes, and applying placement transforms.
+# Reason: These helpers keep repetitive UI workflow logic out of the main Streamlit script.
 """Application workflow helpers for MiniSlicer."""
 
 from __future__ import annotations

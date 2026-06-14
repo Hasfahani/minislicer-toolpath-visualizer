@@ -1,3 +1,5 @@
+# Purpose: Tests app workflow helpers for time formatting, shape building, and placement transforms.
+# Reason: Workflow helpers connect UI inputs to geometry, so they need focused regression coverage.
 """Tests for application workflow helpers."""
 
 from shapely.geometry import MultiPolygon, Polygon

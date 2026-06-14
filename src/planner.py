@@ -1,3 +1,5 @@
+# Purpose: Converts validated geometry and toolpath settings into complete layer and build plans.
+# Reason: This is the planning boundary that makes outputs deterministic, testable, and traceable.
 """Planning engine services for MiniSlicer."""
 
 from __future__ import annotations

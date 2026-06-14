@@ -1,3 +1,5 @@
+# Purpose: Starts the MiniSlicer Streamlit app from the local virtual environment.
+# Reason: A dedicated run script avoids remembering the exact activation and Streamlit command.
 $ErrorActionPreference = "Stop"
 
 if (-not (Test-Path ".venv")) {

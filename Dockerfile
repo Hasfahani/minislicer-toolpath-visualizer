@@ -1,3 +1,5 @@
+# Purpose: Builds a container image that runs the MiniSlicer Streamlit app.
+# Reason: Container packaging makes the app easier to deploy or demonstrate outside the local machine.
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1

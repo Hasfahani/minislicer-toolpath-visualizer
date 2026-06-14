@@ -1,3 +1,5 @@
+# Purpose: Handles JSON config re-apply, SVG/STL import controls, and multi-layer STL previews.
+# Reason: Import workflow is separated because file handling has different state and validation needs.
 """STL import and multi-layer workflow controls."""
 
 from __future__ import annotations
@@ -8,6 +10,7 @@ from typing import Any
 import streamlit as st
 
 from src.plotting import create_3d_figure, create_multilayer_animated_figure
+from src.scenarios import overrides_from_export
 from src.stl_import import load_stl_info, slice_stl_multi_layer
 from src.toolpaths import generate_infill, generate_inward_perimeters, optimize_path_order
 
@@ -21,7 +24,8 @@ def render_import_controls() -> dict[str, Any]:
     stl_info = None
     stl_slice_z = 0.0
 
-    with st.expander("Import", expanded=False):
+    with st.expander("Import (SVG / STL / config)", expanded=False, icon=":material/upload_file:"):
+        st.caption("Optional - upload geometry to replace the built-in shape, or a JSON export to review.")
         uploaded_config = st.file_uploader("Review JSON export", type=["json"])
         if uploaded_config is not None:
             try:
@@ -29,10 +33,18 @@ def render_import_controls() -> dict[str, Any]:
                 imported_config = imported.get("parameters", {}) if isinstance(imported, dict) else {}
                 if imported_config:
                     st.json(imported_config, expanded=False)
-                    st.caption(
-                        "Parameters shown for side-by-side review. "
-                        "Automatic re-apply to the controls is on the roadmap."
-                    )
+                    mapped = overrides_from_export(imported_config)
+                    if mapped:
+                        st.caption(f"{len(mapped)} job parameters can be re-applied to the controls.")
+                        if st.button(
+                            "Apply parameters to controls",
+                            icon=":material/playlist_add_check:",
+                            help="Re-populate shape, toolpath, print, plate, and business controls from this export.",
+                        ):
+                            st.session_state["_overrides"] = mapped
+                            st.rerun()
+                    else:
+                        st.caption("No re-applicable job parameters found in this export.")
                 else:
                     st.warning("No 'parameters' section found in this JSON export.")
             except Exception as exc:  # noqa: BLE001

@@ -1,3 +1,5 @@
+# Purpose: Defines built-in material, quality, printer, and FDM machine export profiles.
+# Reason: Profiles keep process assumptions explicit instead of scattering machine constants through the app.
 """Printer material profiles for FDM and LPBF (powder-bed fusion) processes."""
 
 from __future__ import annotations

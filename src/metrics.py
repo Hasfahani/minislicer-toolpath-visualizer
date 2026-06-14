@@ -1,3 +1,5 @@
+# Purpose: Calculates path length, travel, time, material, area, and efficiency metrics.
+# Reason: Separating metrics from plotting and UI makes engineering calculations testable and reusable.
 """Metrics for simplified toolpath plans."""
 
 from __future__ import annotations

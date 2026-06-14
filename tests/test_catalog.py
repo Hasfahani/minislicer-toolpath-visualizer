@@ -1,3 +1,5 @@
+# Purpose: Verifies every listed shape and infill pattern has matching UI metadata.
+# Reason: Catalog tests prevent sidebar choices from drifting away from their labels/icons.
 """Tests for shared UI catalogs."""
 
 from src.catalog import PATTERN_ICONS, PATTERNS, SHAPE_ICONS, SHAPES

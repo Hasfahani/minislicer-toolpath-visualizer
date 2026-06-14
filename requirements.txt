@@ -1,3 +1,5 @@
+# Purpose: Lists runtime Python dependencies needed to run the Streamlit app.
+# Reason: Keeping runtime packages separate makes installation and deployment simple.
 streamlit>=1.57.0
 shapely>=2.0.4
 numpy>=1.26.0

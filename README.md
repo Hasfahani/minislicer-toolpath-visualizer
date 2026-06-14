@@ -1,26 +1,30 @@
+<!-- # Purpose: Introduces MiniSlicer, explains its capabilities, setup, architecture, limits, and license. -->
+<!-- # Reason: The README is the first document interviewers or companies read to understand the project. -->
 # MiniSlicer Toolpath Planner
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)
 ![Tests](https://img.shields.io/badge/Tests-pytest%20%2B%20GitHub%20Actions-2E7D32)
-![License](https://img.shields.io/badge/License-MIT-blue)
+![License](https://img.shields.io/badge/License-Proprietary-lightgrey)
 
-MiniSlicer is a Streamlit-based additive manufacturing planning workbench for
-exploring 2D slicer logic, comparing infill strategies, reviewing print
-readiness, estimating time/material/cost, and exporting traceable planning
+MiniSlicer is a Streamlit-based additive manufacturing planning workbench. It
+helps users explore slicer logic, compare infill strategies, review print
+readiness, estimate time, material, and cost, and export traceable planning
 packages.
 
-The project is designed as an engineering portfolio and startup-demo prototype:
-it connects geometry processing, deterministic toolpath planning,
-manufacturability checks, cost-stack modeling, and neutral metal DED/WAAM
-feasibility review in one interactive app. It is intentionally honest about its
-scope: MiniSlicer is a planning and visualization tool, not a certified
-production slicer.
+This is an independent product-development project built from a mechatronics
+engineering perspective. The goal is to turn practical manufacturing knowledge
+into clear software that can support early process planning, internal reviews,
+customer discussions, and future commercial use by engineering teams or
+manufacturing companies.
+
+MiniSlicer is intentionally honest about its scope: it is a planning,
+visualization, and feasibility tool, not a certified production slicer.
 
 Production FDM G-code export is guarded by readiness checks and machine bounds,
 but every job must still be validated on the target machine before release.
 
-## Demo Preview
+## Preview
 
 Representative screenshots captured from the live Streamlit app:
 
@@ -42,14 +46,15 @@ Representative screenshots captured from the live Streamlit app:
 |---|---|
 | Geometry | Built-in parametric shapes, custom polygons, SVG outline import, and STL cross-section slicing |
 | Toolpaths | Inward perimeters, parallel, zigzag, grid, triangular, honeycomb, and concentric infill |
-| Planning Engine | Typed toolpath settings, reusable layer planner, full-build segment generation, pattern ranking, and deterministic plan fingerprints |
-| Planning | Per-layer and full-build path estimates, acceleration-aware motion time, travel share, material use, wire-feed balance, heat input, interpass dwell, robot-cell feasibility, and deposition rate |
-| Executive Review | Launch score, readiness score, program risk, unit/batch quote, productivity, DED process model, manufacturing partner fit, production handoff, launch optimizer, what-if playbook, batch scenarios, release checklist, quality scorecard, and cost-stack view |
-| Quality Gates | Plate fit, missing paths, tall layer height, sparse infill, high travel, heavy path count, tall builds, volumetric flow, interpass control, robot reach/payload, and qualification evidence |
-| Commercial Controls | Customer/job metadata, application type, conventional route, urgency, qualification level, material strategy, batch quantity, target price, machine rate, labor rate, setup time, postprocess time, scrap, margin, conventional lead time, and machine-capacity guardrails |
-| Visualization | Toolpath, extrusion-width, speed map, time map, density map, animation, and 3D layer stack views |
+| Planning Engine | Typed settings, reusable layer planning, full-build segment generation, pattern ranking, and deterministic plan fingerprints |
+| Estimates | Path length, travel share, motion time, material use, cost, productivity, and batch impact |
+| Release Review | Readiness score, launch score, program risk, quality scorecard, checklist, and cost-stack view |
+| Quality Gates | Build-plate fit, missing paths, layer height, sparse infill, high travel, path count, volumetric flow, and process evidence |
+| Commercial Inputs | Customer/job metadata, application type, batch quantity, target price, machine rate, labor rate, setup time, postprocess time, scrap, and margin |
+| Metal AM Review | Neutral DED/WAAM estimates for wire demand, heat input, deposition rate, energy, robot-cell feasibility, and qualification burden |
+| Visualization | Toolpath views, extrusion-width maps, speed maps, time maps, density maps, animation, pattern comparison, and 3D layer stacks |
 | Export | CSV, JSON, SVG, preview G-code, guarded FDM production G-code, markdown dossier, HTML dossier, and text report |
-| Traceability | JSON exports include active parameters and segment data; planning packages receive deterministic fingerprints |
+| Traceability | Exports include active parameters, segment data, and stable planning fingerprints |
 
 ## Quick Start
 
@@ -99,25 +104,26 @@ http://localhost:8501
 
 ## Example Use Cases
 
-- Demonstrate slicer fundamentals in a manufacturing, robotics, or CAD/CAM
-  course.
-- Compare infill strategies for path length, travel share, time, and material
-  impact.
+- Compare infill strategies for path length, travel share, time, and material.
 - Review whether an imported SVG or STL cross-section is reasonable before
   deeper process planning.
-- Produce a traceable planning packet for an early-stage customer or internal
+- Produce a traceable planning packet for an early customer or internal
   design review.
 - Explore how process assumptions affect FDM quote estimates and launch
   readiness.
-- Present a neutral DED/WAAM feasibility screen covering envelope fit, wire
+- Review a neutral DED/WAAM feasibility screen covering envelope fit, wire
   demand, energy, interpass risk, robot reach, payload, and qualification
   burden.
+- Support manufacturing, robotics, mechatronics, or CAD/CAM learning when the
+  tool is used in an educational setting.
 
 ## Workflow
 
 1. Choose a quality profile, build plate, process mode, and control depth in
-   Quick Setup.
-2. Import SVG/STL geometry or use a built-in parametric shape.
+   Quick Setup - or load a sample job to populate every control in one click.
+2. Import SVG/STL geometry or use a built-in parametric shape. A prior JSON
+   export can also re-apply its job parameters to the controls from the Import
+   section.
 3. Tune perimeters, infill, print settings, placement, optimization, and preview
    appearance.
 4. Set job metadata, batch quantity, quote assumptions, target price, and
@@ -138,31 +144,26 @@ http://localhost:8501
 11. Use production G-code only when readiness is unblocked, process mode is FDM,
     and the selected machine profile matches the physical printer.
 
-## Portfolio Framing
+## Project Direction
 
-MiniSlicer is technically valuable because it turns several manufacturing
-engineering concerns into a coherent software system:
+MiniSlicer is being developed as a practical engineering product, not only as a
+software demonstration. It combines software, manufacturing logic, and
+mechatronics thinking in one tool so that additive manufacturing decisions are
+easier to inspect, compare, and explain.
 
-- Geometry processing: Shapely offsets, clipping, polygon validation, SVG
-  parsing, and STL cross-section slicing.
-- Toolpath planning: perimeters, multiple infill families, path ordering,
-  layer-aware planning, full-build segment generation, and pattern ranking.
-- Determinism: stable plan fingerprints connect geometry, settings, process,
-  material, and layer count for repeatable review.
-- Time and material estimation: acceleration-aware motion timing and bead-volume
-  approximations provide more realistic planning signals than length-only
-  estimates.
-- Readiness checks: the app flags build-plate fit, missing paths, excessive
-  layer height, sparse infill, travel-heavy plans, volumetric-flow risk, tall
-  builds, and metal-process release concerns.
-- Business modeling: transparent quote, cost-stack, productivity, batch, and
-  launch-score calculations connect engineering choices to commercial outcomes.
-- Metal DED review: neutral WAAM/DED assumptions estimate wire demand, heat
-  input, deposited mass, energy intensity, envelope utilization, robot-cell
-  feasibility, and qualification evidence.
-- Traceable exports: CSV, JSON, SVG, preview G-code, guarded FDM production
-  G-code, markdown dossiers, HTML dossiers, and text reports support review
-  handoff without claiming machine certification.
+The project focuses on:
+
+- Clear geometry and toolpath visualization for engineering review.
+- Deterministic planning outputs that can be repeated and compared.
+- Practical readiness checks before a job moves toward a real machine.
+- Transparent time, material, cost, and productivity estimates.
+- Early FDM planning support with guarded production G-code export.
+- Neutral DED/WAAM feasibility review for large-format metal AM discussions.
+- Exportable dossiers that help communicate assumptions, risks, and results.
+
+The long-term direction is to keep improving MiniSlicer into a useful tool for
+companies, workshops, labs, and engineering teams that need simple, traceable
+additive manufacturing planning support.
 
 ## Quick Architecture
 
@@ -290,15 +291,16 @@ See [docs/limitations.md](docs/limitations.md) for the fuller list.
 
 ## Roadmap
 
-- Improve JSON config round-tripping so exported parameters can repopulate UI
-  controls.
+- Extend config re-apply to advanced and DED fields (core job parameters -
+  shape, toolpath, print, plate, and business basics - already repopulate the
+  controls from a JSON export or a sample job).
 - Add richer example STL fixtures with clear licenses and small file sizes.
 - Add richer STL diagnostics for scale, units, watertightness, and slice quality.
 - Add more machine profiles and explicit profile provenance notes.
 - Expand production G-code safeguards with preview simulation and printer-family
   compatibility checks.
-- Add optional report templates for recruiting demos, university reviews, and
-  customer-facing feasibility studies.
+- Add optional report templates for customer-facing feasibility studies,
+  internal engineering reviews, and production handoff packages.
 - Add benchmark fixtures for large geometries and dense infill patterns.
 
 ## Project Structure
@@ -332,4 +334,5 @@ qualification, fixture review, collision checking, or machine commissioning.
 
 ## License
 
-This project is released under the [MIT License](LICENSE).
+This project is proprietary software. All rights are reserved. See
+[LICENSE](LICENSE) for details.

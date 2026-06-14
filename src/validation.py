@@ -1,3 +1,5 @@
+# Purpose: Turns planning, geometry, and process signals into readiness issues and scores.
+# Reason: Validation protects exports and shows users what must be fixed before release.
 """Job readiness checks for MiniSlicer planning results."""
 
 from __future__ import annotations

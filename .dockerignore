@@ -1,3 +1,5 @@
+# Purpose: Excludes local caches, logs, screenshots, and build artifacts from Docker builds.
+# Reason: Smaller Docker build contexts are faster and avoid copying private/generated files into images.
 .git
 .pytest_cache
 .streamlit

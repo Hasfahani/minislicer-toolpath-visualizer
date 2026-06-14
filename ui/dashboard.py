@@ -1,3 +1,5 @@
+# Purpose: Renders release dashboards, quality cards, DED panels, partner fit, and next actions.
+# Reason: Dashboard code is separated from calculations so presentation can evolve without changing models.
 """Polished dashboard surfaces for MiniSlicer."""
 
 from __future__ import annotations

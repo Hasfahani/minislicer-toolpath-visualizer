@@ -1,3 +1,5 @@
+# Purpose: Tests perimeter generation, infill patterns, segment building, travel, and simplification.
+# Reason: Toolpath tests verify the core slicer behavior independently from the Streamlit UI.
 """Tests for src/toolpaths.py path generation and segment building."""
 
 from shapely.geometry import LineString

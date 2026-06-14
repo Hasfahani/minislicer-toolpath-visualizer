@@ -1,3 +1,5 @@
+# Purpose: Parses practical SVG outlines into Shapely polygons for toolpath generation.
+# Reason: SVG import gives users a lightweight way to test real outlines without needing CAD/STL files.
 """Parse SVG files into Shapely polygons for toolpath slicing."""
 
 from __future__ import annotations

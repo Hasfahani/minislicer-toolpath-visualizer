@@ -1,3 +1,5 @@
+# Purpose: Stores the shared shape and infill pattern lists plus their small UI labels.
+# Reason: A central catalog keeps sidebar choices, icons, and tests consistent across the app.
 """Shared shape and toolpath catalogs for the MiniSlicer UI."""
 
 SHAPES = [

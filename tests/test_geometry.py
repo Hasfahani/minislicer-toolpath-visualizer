@@ -1,3 +1,5 @@
+# Purpose: Tests shape creation, custom polygon parsing, validation, and basic geometry utilities.
+# Reason: Geometry is the foundation of every path, metric, and export, so it gets direct coverage.
 """Tests for src/geometry.py shape creation and validation."""
 
 import math

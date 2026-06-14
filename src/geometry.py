@@ -1,3 +1,5 @@
+# Purpose: Creates, validates, parses, and measures 2D Shapely geometry used by the slicer.
+# Reason: Geometry is isolated here so toolpath planning receives clean polygons instead of raw UI input.
 """Geometry helpers for educational toolpath visualization."""
 
 from __future__ import annotations

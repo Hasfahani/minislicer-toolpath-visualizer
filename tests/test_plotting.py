@@ -1,3 +1,5 @@
+# Purpose: Tests Plotly figure builders for paths, maps, metrics, 3D views, and animations.
+# Reason: Visualization tests catch empty or broken figures before the app is shown live.
 """Tests for src/plotting.py - figure construction and trace validation."""
 
 from __future__ import annotations

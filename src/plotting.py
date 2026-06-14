@@ -1,3 +1,5 @@
+# Purpose: Builds Plotly figures for 2D paths, 3D layer stacks, comparisons, speed, time, and density.
+# Reason: Visualization stays separate from planning so the same data can be inspected in multiple ways.
 """Plotly figure generation for toolpath visualization."""
 
 from __future__ import annotations

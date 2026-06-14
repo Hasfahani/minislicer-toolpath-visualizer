@@ -1,3 +1,5 @@
+# Purpose: Tests path length, time, material, bounding-box, and summary metric calculations.
+# Reason: Metrics drive the dashboard and quotes, so formulas must stay predictable.
 """Tests for src/metrics.py - path length, print time, bounding box, material estimate."""
 
 from __future__ import annotations

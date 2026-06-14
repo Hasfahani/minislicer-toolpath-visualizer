@@ -1,3 +1,5 @@
+# Purpose: Main Streamlit application that connects controls, planning, metrics, dashboards, and exports.
+# Reason: Kept as the user-facing orchestrator so the project can be demonstrated as one complete workflow.
 """Streamlit app for MiniSlicer toolpath visualization."""
 
 from __future__ import annotations
@@ -926,73 +928,88 @@ tab_design, tab_plan, tab_release = st.tabs(["Design", "Plan", "Release"])
 
 # ---- Design -----------------------------------------------------------------
 with tab_design:
-    ctrl_row = st.columns([2, 1, 1])
-    preview_layer = ctrl_row[0].slider(
-        "Layer preview", 1, min(layer_count, 50), min(int(layer_number), min(layer_count, 50)),
-        help="Preview any layer up to layer 50.",
-    )
-    mode = ctrl_row[1].selectbox(
-        "View mode",
-        ["Toolpath", "Extrusion", "Perimeters only", "Infill only", "Travel only", "Speed map", "Time map", "Density"],
-    )
-    auto_fit_axes = ctrl_row[2].checkbox("Auto-fit axes", value=True)
+    view_modes = [
+        "Toolpath", "Extrusion", "Perimeters only", "Infill only",
+        "Travel only", "Speed map", "Time map", "Density",
+    ]
+    # The preview controls (layer scrub + View pills + auto-fit) only touch this
+    # chart, so they run inside a fragment. Changing them reruns the fragment
+    # alone instead of the whole script (no re-ranking, no production G-code or
+    # dossier regeneration), which keeps live scrubbing and view-switching snappy.
+    @st.fragment
+    def _render_layer_preview() -> None:
+        ctrl_row = st.columns([3, 1])
+        preview_layer = ctrl_row[0].slider(
+            "Layer preview", 1, min(layer_count, 50), min(int(layer_number), min(layer_count, 50)),
+            help="Scrub through layers up to layer 50.",
+        )
+        auto_fit_axes = ctrl_row[1].toggle(
+            "Auto-fit axes", value=True,
+            help="Turn off to keep your current zoom/pan while switching views.",
+        )
+        mode = st.pills(
+            "View", view_modes, default="Toolpath", selection_mode="single",
+            help="One click to switch how the active layer is rendered.",
+        ) or "Toolpath"
 
-    layer_angle = (
-        45.0 if alternate_angle and preview_layer % 2 == 1
-        else -45.0 if alternate_angle
-        else effective_angle
-    )
-    preview_infill = infill_lines
-    if layer_angle != effective_angle:
-        preview_infill = _cached_plan_layer(
-            _shape_wkt, _infill_wkt, toolpath_settings,
-            layer=preview_layer, infill_angle_deg=layer_angle,
-        ).infill_lines
+        layer_angle = (
+            45.0 if alternate_angle and preview_layer % 2 == 1
+            else -45.0 if alternate_angle
+            else effective_angle
+        )
+        preview_infill = infill_lines
+        if layer_angle != effective_angle:
+            preview_infill = _cached_plan_layer(
+                _shape_wkt, _infill_wkt, toolpath_settings,
+                layer=preview_layer, infill_angle_deg=layer_angle,
+            ).infill_lines
 
-    info_col1, info_col2, info_col3, info_col4 = st.columns(4)
-    info_col1.caption(f"**Layer** {preview_layer} / {layer_count}")
-    info_col2.caption(f"**Pattern** {PATTERN_ICONS.get(infill_pattern, '')} {infill_pattern}")
-    info_col3.caption(f"**Spacing** {effective_spacing:.2f} mm")
-    info_col4.caption(f"**Angle** {layer_angle:+.0f} deg")
+        info_col1, info_col2, info_col3, info_col4 = st.columns(4)
+        info_col1.caption(f"**Layer** {preview_layer} / {layer_count}")
+        info_col2.caption(f"**Pattern** {PATTERN_ICONS.get(infill_pattern, '')} {infill_pattern}")
+        info_col3.caption(f"**Spacing** {effective_spacing:.2f} mm")
+        info_col4.caption(f"**Angle** {layer_angle:+.0f} deg")
 
-    common = dict(
-        line_width_scale=float(line_width_scale),
-        color_scheme=color_scheme,
-        build_plate_size=plate_size,
-        show_direction_arrows=show_arrows,
-        show_dimensions=show_dimensions,
-    )
-    if mode == "Speed map":
-        fig = create_speed_map_figure(
-            boundary, perimeters, preview_infill, print_speed,
-            travel_speed, line_width_scale, plate_size, perimeter_speed_mult,
+        common = dict(
+            line_width_scale=float(line_width_scale),
+            color_scheme=color_scheme,
+            build_plate_size=plate_size,
+            show_direction_arrows=show_arrows,
+            show_dimensions=show_dimensions,
         )
-    elif mode == "Time map":
-        fig = create_time_map_figure(
-            boundary, perimeters, preview_infill, print_speed, line_width_scale, plate_size,
-        )
-    elif mode == "Density":
-        fig = create_path_density_figure(
-            perimeters, preview_infill, boundary, build_plate_size=plate_size,
-        )
-    else:
-        fig = create_toolpath_figure(
-            boundary,
-            perimeters if mode != "Infill only" else [],
-            preview_infill if mode != "Perimeters only" else [],
-            show_travel_moves=show_travel or mode == "Travel only",
-            show_seam_markers=show_seams,
-            show_boundary=show_boundary,
-            show_perimeters=show_perimeters and mode not in ("Infill only", "Travel only"),
-            show_infill=show_infill and mode not in ("Perimeters only", "Travel only"),
-            show_start_end_points=show_start_end,
-            extrusion_width_mm=float(nozzle_diameter) if mode == "Extrusion" else extrusion_width,
-            print_speed_mm_s=float(print_speed),
-            **common,
-        )
-    if not auto_fit_axes:
-        fig.update_layout(uirevision="preserve-preview-zoom")
-    st.plotly_chart(fig, width="stretch")
+        if mode == "Speed map":
+            fig = create_speed_map_figure(
+                boundary, perimeters, preview_infill, print_speed,
+                travel_speed, line_width_scale, plate_size, perimeter_speed_mult,
+            )
+        elif mode == "Time map":
+            fig = create_time_map_figure(
+                boundary, perimeters, preview_infill, print_speed, line_width_scale, plate_size,
+            )
+        elif mode == "Density":
+            fig = create_path_density_figure(
+                perimeters, preview_infill, boundary, build_plate_size=plate_size,
+            )
+        else:
+            fig = create_toolpath_figure(
+                boundary,
+                perimeters if mode != "Infill only" else [],
+                preview_infill if mode != "Perimeters only" else [],
+                show_travel_moves=show_travel or mode == "Travel only",
+                show_seam_markers=show_seams,
+                show_boundary=show_boundary,
+                show_perimeters=show_perimeters and mode not in ("Infill only", "Travel only"),
+                show_infill=show_infill and mode not in ("Perimeters only", "Travel only"),
+                show_start_end_points=show_start_end,
+                extrusion_width_mm=float(nozzle_diameter) if mode == "Extrusion" else extrusion_width,
+                print_speed_mm_s=float(print_speed),
+                **common,
+            )
+        if not auto_fit_axes:
+            fig.update_layout(uirevision="preserve-preview-zoom")
+        st.plotly_chart(fig, width="stretch")
+
+    _render_layer_preview()
 
     if stl_bytes is not None:
         st.markdown("---")
@@ -1086,11 +1103,54 @@ with tab_plan:
         else:
             st.info("Pick two patterns. Comparison updates automatically when **Auto-compare** is on.")
 
+    with st.expander("All-pattern preview matrix", expanded=False):
+        st.caption(
+            "Render every infill pattern on the current shape and layer, side by side. "
+            "Off by default so it only computes when you ask for it."
+        )
+        if st.toggle("Render all patterns", value=False, key="show_pattern_matrix"):
+            ranking_by_pattern = {row["pattern"]: row for row in pattern_ranking}
+            grid_cols = st.columns(3)
+            for idx, pat in enumerate(PATTERNS):
+                pat_plan = _cached_plan_layer(
+                    _shape_wkt, _infill_wkt,
+                    replace(toolpath_settings, infill_pattern=pat),
+                    layer=int(layer_number),
+                )
+                fig_pat = create_toolpath_figure(
+                    pat_plan.boundary, pat_plan.perimeters, pat_plan.infill_lines,
+                    show_boundary=True, show_perimeters=True, show_infill=True,
+                    show_start_end_points=False,
+                    line_width_scale=float(line_width_scale), color_scheme=color_scheme,
+                )
+                fig_pat.update_layout(
+                    height=240, margin=dict(l=6, r=6, t=30, b=6),
+                    title=f"{PATTERN_ICONS.get(pat, '')} {pat}", showlegend=False,
+                )
+                cell = grid_cols[idx % 3]
+                cell.plotly_chart(fig_pat, width="stretch", key=f"pattern_grid_{idx}")
+                row = ranking_by_pattern.get(pat)
+                if row is not None:
+                    cell.caption(
+                        f"{row['line_count']} lines - {row['travel_mm']:.0f} mm travel - "
+                        f"{row['efficiency_pct']:.0f}% efficient"
+                    )
+        else:
+            st.caption("Toggle on to render all six patterns at the current settings.")
+
     with st.expander("Toolpath Animation", expanded=False):
-        if segments:
+        # The animation builds a Plotly frame stack, which is the heaviest single
+        # render on the page. It is opt-in (off by default) so a normal rerun -
+        # changing a control, switching tabs - never pays for it.
+        if not segments:
+            st.info("No segments to animate - try adjusting perimeter count or infill spacing.")
+        elif st.toggle(
+            "Show nozzle animation", value=False, key="show_animation",
+            help="Builds a segment-by-segment playback. Off by default to keep the app responsive.",
+        ):
             st.plotly_chart(create_animated_figure(boundary, segments), width="stretch")
         else:
-            st.info("No segments to animate - try adjusting perimeter count or infill spacing.")
+            st.caption(f"{len(segments):,} segments ready. Toggle on to render the nozzle playback.")
 
     with st.expander("Metrics Detail", expanded=False):
         mg1, mg2, mg3, mg4, mg5 = st.columns(5)
@@ -1196,6 +1256,53 @@ with tab_release:
         release_checklist,
         optimization_playbook,
     )
+
+    st.markdown("---")
+    st.markdown("### Quote Sensitivity")
+    st.caption(
+        "How the unit quote moves when one commercial assumption changes; "
+        "every other input stays fixed at its current value."
+    )
+
+    def _quote_for(margin=None, machine=None, scrap=None, batch=None) -> float:
+        return estimate_job_economics(
+            metrics=metrics, layer_count=layer_count, layer_height_mm=float(layer_height),
+            nozzle_diameter_mm=float(nozzle_diameter), print_speed_mm_s=float(print_speed),
+            full_time_s=full_time_s, full_weight_g=full_weight_g,
+            material_cost_per_kg=float(material_cost),
+            machine_rate_per_h=float(machine_rate_per_h if machine is None else machine),
+            labor_rate_per_h=float(labor_rate_per_h),
+            setup_time_min=float(setup_time_min), postprocess_time_min=float(postprocess_time_min),
+            scrap_allowance_pct=float(scrap_allowance_pct if scrap is None else scrap),
+            margin_pct=float(margin_pct if margin is None else margin),
+            batch_quantity=int(batch_quantity if batch is None else batch),
+        )["quoted_price"]
+
+    base_price = float(economics["quoted_price"])
+    sens_driver = st.selectbox(
+        "Sweep this assumption",
+        ["Margin (%)", "Machine rate ($/h)", "Scrap allowance (%)", "Batch quantity"],
+        key="quote_sens_driver",
+    )
+    if sens_driver == "Margin (%)":
+        rows = [(f"{v:.0f}%", _quote_for(margin=v), abs(v - margin_pct) < 1e-6)
+                for v in [max(0.0, margin_pct + d) for d in (-15, -7.5, 0, 7.5, 15)]]
+    elif sens_driver == "Machine rate ($/h)":
+        rows = [(f"${v:.0f}/h", _quote_for(machine=v), abs(v - machine_rate_per_h) < 1e-6)
+                for v in [max(0.0, machine_rate_per_h * m) for m in (0.5, 0.75, 1.0, 1.5, 2.0)]]
+    elif sens_driver == "Scrap allowance (%)":
+        rows = [(f"{v:.0f}%", _quote_for(scrap=v), abs(v - scrap_allowance_pct) < 1e-6)
+                for v in [max(0.0, scrap_allowance_pct + d) for d in (-6, -3, 0, 3, 6)]]
+    else:
+        base_b = max(1, int(batch_quantity))
+        rows = [(str(v), _quote_for(batch=v), v == base_b)
+                for v in sorted({1, base_b, base_b * 2, 10, 25, 50})]
+
+    sens_lines = [f"| {sens_driver} | Unit quote | vs current |", "|---|---|---|"]
+    for label, price, is_current in rows:
+        marker = " (current)" if is_current else ""
+        sens_lines.append(f"| {label}{marker} | ${price:.2f} | {price - base_price:+.2f} |")
+    st.markdown("\n".join(sens_lines))
 
     st.markdown("---")
     render_ded_process_panel(ded_analysis)

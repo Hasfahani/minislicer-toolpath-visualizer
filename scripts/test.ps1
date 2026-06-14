@@ -1,3 +1,5 @@
+# Purpose: Runs ruff linting and pytest from the local virtual environment.
+# Reason: One test command gives a reliable pre-demo and pre-commit quality check.
 $ErrorActionPreference = "Stop"
 
 if (-not (Test-Path ".venv")) {

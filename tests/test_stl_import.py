@@ -1,3 +1,5 @@
+# Purpose: Tests STL metadata loading and horizontal mesh slicing into polygons.
+# Reason: STL import is a high-risk dependency path, so it is checked with a generated mesh fixture.
 """Tests for STL import and slicing helpers."""
 
 import trimesh

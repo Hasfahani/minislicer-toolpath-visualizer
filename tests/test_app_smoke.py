@@ -1,3 +1,5 @@
+# Purpose: Smoke-tests the Streamlit app in default, advanced, and metal-process modes.
+# Reason: These tests catch broken UI contracts before a demo or interview presentation.
 """Smoke tests for the Streamlit application shell.
 
 These tests render the real app with streamlit.testing and exercise the
