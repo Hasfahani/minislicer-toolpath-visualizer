@@ -119,6 +119,7 @@ st.info(
 st.markdown(
     "**Jump to:** "
     "[Layout map](#layout-map) | "
+    "[Step-by-step use](#step-by-step-use) | "
     "[Five-minute walkthrough](#walkthrough) | "
     "[Goal recipes](#goal-recipes) | "
     "[Control reference](#control-reference) | "
@@ -133,7 +134,8 @@ st.markdown(
     "[Data columns](#data-columns) | "
     "[Pre-export audit](#pre-export-audit) | "
     "[Glossary](#glossary) | "
-    "[Presenter notes](#presenter-notes)"
+    "[Presenter notes](#presenter-notes) | "
+    "[Summary](#summary)"
 )
 
 top_cards = st.columns(3)
@@ -235,6 +237,60 @@ st.markdown(
     <strong>Controls</strong> to <strong>Advanced</strong> to reveal overrides inside
     every numbered section (extra toolpath, print, placement, business, and DED fields,
     plus the Quality / Export section).
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# Step-by-step use
+# ---------------------------------------------------------------------------
+st.header("Step-by-step: how to use MiniSlicer", anchor="step-by-step-use")
+st.markdown(
+    """
+    Use this sequence when you are opening the app for the first time or when you
+    want a clean repeatable workflow from idea to export.
+
+    1. **Open the planner.** Use the sidebar page list to switch from this tutorial
+       to the MiniSlicer planner.
+    2. **Start with Quick Setup.** Load a sample job for a guided example, or choose
+       a Quality profile, Build plate size, Controls mode, and Process mode yourself.
+       For a first run, use Balanced, 220 x 220, Basic, and FDM.
+    3. **Choose the part geometry.** In the Import section, upload SVG or STL geometry
+       if you have it. Otherwise use **1 - Shape** to pick a built-in shape and set
+       its dimensions.
+    4. **Set the toolpath.** In **2 - Toolpath**, choose the number of perimeters,
+       infill pattern, and either spacing or density. Change one setting at a time
+       so the preview and metrics are easy to understand.
+    5. **Enter print settings.** In **3 - Print settings**, set model height, material,
+       layer height, nozzle diameter, speeds, and cost assumptions. These values drive
+       the time, material, weight, and quote estimates.
+    6. **Place the part.** In **4 - Placement**, turn on the build plate, center the
+       part, scale or rotate it if needed, and confirm it fits inside the selected
+       machine area.
+    7. **Inspect the Design tab.** Use the View pills to check Toolpath, Travel only,
+       Speed map, and Density. This is the fastest way to spot bad spacing, high
+       travel, or geometry that does not look right.
+    8. **Compare options in the Plan tab.** Review pattern ranking, A/B comparison,
+       animation, and metrics. Use these panels to decide whether the current pattern
+       is actually better than the alternatives.
+    9. **Check release readiness.** Open the Release tab and read the launch score,
+       Release Gates, Advisor findings, quote, and segment ledger. Fix blockers before
+       exporting anything meant for machine review.
+    10. **Export the package.** Use CSV, SVG, JSON, report, Markdown, or HTML for review
+        packages. Use production G-code only for FDM jobs after Advisor is unblocked
+        and after a human machine-specific review.
+    """
+)
+
+st.markdown(
+    """
+    <div class="guide-callout">
+    First-time shortcut: load the FDM sample job, open Design to understand the preview,
+    open Plan to compare patterns, then open Release to see whether the job is ready
+    enough to export.
     </div>
     """,
     unsafe_allow_html=True,
@@ -1144,6 +1200,36 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True,
+)
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+st.header("In summary", anchor="summary")
+st.markdown(
+    """
+    MiniSlicer is the planning step between designing a part and printing it.
+    You design your part somewhere else - in CAD - then bring it into MiniSlicer
+    as an SVG outline, an STL cross-section, or a built-in shape. From there,
+    MiniSlicer does the thinking before anything reaches a machine:
+
+    - **Plans the toolpath:** the walls and the infill pattern the printer would follow.
+    - **Estimates the job:** path length, print time, material use, and cost.
+    - **Checks readiness:** flags problems like build-plate fit, sparse infill, or
+      excessive travel before you commit.
+    - **Reviews metal feasibility (DED / WAAM):** estimates wire demand, heat input,
+      deposition rate, energy, and material saved versus machining from solid.
+    - **Exports a record:** data files, guarded G-code, and a traceable dossier, each
+      with a unique fingerprint so results can be repeated and compared.
+
+    What MiniSlicer does not do: it does not design your part, and it is not a
+    certified production slicer. It is a planning, visualization, and feasibility
+    tool. Every job still needs validation on the real machine before printing.
+
+    **In one line:** design it elsewhere, plan and check it here, print it on the machine.
+    """
 )
 
 st.success(
