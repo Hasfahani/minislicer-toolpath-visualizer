@@ -123,32 +123,38 @@ def optimize_path_order(
     if not remaining:
         return []
 
-    ordered: list[LineString] = []
-    current = remaining.pop(0)
-    ordered.append(current)
+    starts = np.asarray([_line_start(line) for line in remaining], dtype=float)
+    ends = np.asarray([_line_end(line) for line in remaining], dtype=float)
+    active = np.ones(len(remaining), dtype=bool)
 
-    while remaining:
-        curr_end = _line_end(ordered[-1])
-        best_idx = 0
+    ordered: list[LineString] = [remaining[0]]
+    active[0] = False
+    current_end = ends[0]
+
+    while active.any():
+        start_dist_sq = np.sum((starts - current_end) ** 2, axis=1)
+        start_dist_sq[~active] = np.inf
+        start_idx = int(np.argmin(start_dist_sq))
+        best_idx = start_idx
         best_reversed = False
-        best_dist = float("inf")
+        best_dist_sq = float(start_dist_sq[start_idx])
 
-        for idx, cand in enumerate(remaining):
-            start_dist = _point_distance(curr_end, _line_start(cand))
-            if start_dist < best_dist:
-                best_dist = start_dist
-                best_idx = idx
-                best_reversed = False
+        if allow_reverse:
+            end_dist_sq = np.sum((ends - current_end) ** 2, axis=1)
+            end_dist_sq[~active] = np.inf
+            end_idx = int(np.argmin(end_dist_sq))
+            if float(end_dist_sq[end_idx]) < best_dist_sq:
+                best_idx = end_idx
+                best_reversed = True
 
-            if allow_reverse:
-                end_dist = _point_distance(curr_end, _line_end(cand))
-                if end_dist < best_dist:
-                    best_dist = end_dist
-                    best_idx = idx
-                    best_reversed = True
-
-        chosen = remaining.pop(best_idx)
-        ordered.append(_reversed_line(chosen) if best_reversed else chosen)
+        active[best_idx] = False
+        chosen = remaining[best_idx]
+        if best_reversed:
+            ordered.append(_reversed_line(chosen))
+            current_end = starts[best_idx]
+        else:
+            ordered.append(chosen)
+            current_end = ends[best_idx]
 
     return ordered
 
