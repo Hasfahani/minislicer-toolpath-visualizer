@@ -53,6 +53,7 @@ Representative screenshots captured from the live Streamlit app:
 | Commercial Inputs | Customer/job metadata, application type, batch quantity, target price, machine rate, labor rate, setup time, postprocess time, scrap, and margin |
 | Metal AM Review | Neutral DED/WAAM estimates for wire demand, heat input, deposition rate, energy, robot-cell feasibility, and qualification burden |
 | Process Intelligence | Versioned qualified-build records, dataset coverage review, applicability gating, and bounded DED parameter recommendations |
+| Company Operations | Password authentication, role-based approvals, persistent SQLite records, model registry, recommendation release, and audit history |
 | Visualization | Toolpath views, extrusion-width maps, speed maps, time maps, density maps, animation, pattern comparison, and 3D layer stacks |
 | Export | CSV, JSON, SVG, preview G-code, guarded FDM production G-code, markdown dossier, HTML dossier, and text report |
 | Traceability | Exports include active parameters, segment data, and stable planning fingerprints |
@@ -146,6 +147,8 @@ http://localhost:8501
     and the selected machine profile matches the physical printer.
 12. Open Process Intelligence to upload qualified build records and request a
     bounded DED starting-parameter recommendation for a known machine/material domain.
+13. Use the company workflow to approve build evidence, promote evaluated model
+    snapshots, release recommendations, manage users, and review the audit trail.
 
 ## Project Direction
 
@@ -233,6 +236,15 @@ motion or bypasses deterministic release gates.
 
 See [docs/process-intelligence.md](docs/process-intelligence.md) for the data
 contract, validation boundary, and suggested company storage architecture.
+
+Company deployments store operational state in `data/minislicer.db` by default.
+Set `MINISLICER_DB_PATH` to place the SQLite database on a persistent volume.
+The first visit to Company Operations creates the initial administrator; later
+visits require authentication. Roles are `admin`, `engineer`, `operator`, and
+`viewer`.
+
+For multi-instance or high-concurrency deployments, migrate the storage adapter
+to PostgreSQL before scaling beyond one Streamlit application instance.
 
 The quote model is transparent by design. Setup labor is amortized across the
 batch, while machine time, material, and postprocess labor remain per-part

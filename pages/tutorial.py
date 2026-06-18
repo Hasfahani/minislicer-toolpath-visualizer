@@ -6,11 +6,14 @@ from __future__ import annotations
 
 import streamlit as st
 
+from src.company_auth import require_global_access_if_configured
+
 st.set_page_config(
     page_title="MiniSlicer - Advanced Guide",
     layout="wide",
     page_icon=":material/menu_book:",
 )
+require_global_access_if_configured()
 
 
 def tutorial_css() -> None:

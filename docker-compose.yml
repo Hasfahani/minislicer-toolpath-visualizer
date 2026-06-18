@@ -5,6 +5,11 @@ services:
     build: .
     ports:
       - "8501:8501"
+    environment:
+      MINISLICER_DB_PATH: /app/data/minislicer.db
+      MINISLICER_AUTH_REQUIRED: "true"
+    volumes:
+      - minislicer-data:/app/data
     command:
       - streamlit
       - run
@@ -21,3 +26,6 @@ services:
       timeout: 5s
       start_period: 20s
       retries: 3
+
+volumes:
+  minislicer-data:

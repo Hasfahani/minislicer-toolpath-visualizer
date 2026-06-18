@@ -393,6 +393,79 @@ def dataset_summary(records: Iterable[BuildRecord]) -> dict[str, Any]:
     }
 
 
+def evaluate_recommendation_engine(
+    records: Iterable[BuildRecord],
+    *,
+    neighbors: int = DEFAULT_NEIGHBORS,
+    max_applicability_distance: float = 3.0,
+    test_fraction: float = 0.2,
+) -> dict[str, Any]:
+    """Evaluate parameter recommendations on complete, chronologically unseen builds."""
+    rows = list(records)
+    train, test = grouped_time_split(rows, test_fraction=test_fraction)
+    if len(train) < MIN_TRAINING_BUILDS or not test:
+        return {
+            "status": "insufficient_evaluation_data",
+            "train_builds": len(train),
+            "test_builds": len(test),
+            "recommended_builds": 0,
+            "coverage": 0.0,
+            "mae": {},
+        }
+
+    machine_ids = {record.machine_id for record in rows}
+    material_ids = {record.material_id for record in rows}
+    if len(machine_ids) != 1 or len(material_ids) != 1:
+        raise ValueError("Evaluation records must belong to one machine/material domain.")
+    machine_id = next(iter(machine_ids))
+    material_id = next(iter(material_ids))
+    engine = ProcessRecommendationEngine(
+        neighbors=neighbors,
+        max_applicability_distance=max_applicability_distance,
+    ).fit(train, machine_id=machine_id, material_id=material_id)
+
+    training_targets = np.vstack([record.parameters.vector() for record in train])
+    envelope = ParameterEnvelope(
+        minimum=_parameters_from_vector(training_targets.min(axis=0)),
+        maximum=_parameters_from_vector(training_targets.max(axis=0)),
+    )
+    absolute_errors: list[np.ndarray] = []
+    confidence_values: list[float] = []
+    for record in test:
+        recommendation = engine.recommend(record.features, envelope=envelope)
+        if recommendation.parameters is None:
+            continue
+        absolute_errors.append(
+            np.abs(recommendation.parameters.vector() - record.parameters.vector())
+        )
+        confidence_values.append(recommendation.confidence)
+
+    if not absolute_errors:
+        return {
+            "status": "no_test_recommendations",
+            "train_builds": len(train),
+            "test_builds": len(test),
+            "recommended_builds": 0,
+            "coverage": 0.0,
+            "mean_confidence": 0.0,
+            "mae": {},
+        }
+
+    errors = np.vstack(absolute_errors)
+    return {
+        "status": "evaluated",
+        "train_builds": len(train),
+        "test_builds": len(test),
+        "recommended_builds": len(absolute_errors),
+        "coverage": len(absolute_errors) / len(test),
+        "mean_confidence": float(np.mean(confidence_values)),
+        "mae": {
+            name: float(errors[:, index].mean())
+            for index, name in enumerate(TARGET_NAMES)
+        },
+    }
+
+
 def _parameters_from_vector(vector: np.ndarray) -> ProcessParameters:
     return ProcessParameters(**{
         name: float(vector[index])

@@ -12,6 +12,7 @@ import streamlit as st
 
 from src.animation import create_animated_figure
 from src.catalog import PATTERN_ICONS, PATTERNS, SHAPE_ICONS, SHAPES
+from src.company_auth import require_global_access_if_configured
 from src.exporters import segments_to_dataframe
 from src.geometry import validate_polygon
 from src.job_analysis import (
@@ -353,6 +354,7 @@ st.set_page_config(
     page_icon=":material/build:",
     initial_sidebar_state="expanded",
 )
+require_global_access_if_configured()
 app_css()
 render_header()
 
