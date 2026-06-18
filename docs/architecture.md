@@ -10,6 +10,7 @@ User controls
   -> toolpath planning
   -> metrics and job analysis
   -> readiness validation
+  -> optional process-intelligence advice
   -> visualization and export
 ```
 
@@ -34,6 +35,8 @@ The `ui/` package splits user-facing controls into smaller modules:
   panels.
 - `ui/export_panel.py`: download buttons, preview panes, and guarded production
   G-code export state.
+- `pages/process_intelligence.py`: qualified-build dataset review and bounded
+  DED parameter recommendations.
 
 ## Geometry Layer
 
@@ -104,6 +107,24 @@ algorithms:
 The analysis layer is deliberately transparent. Default assumptions are visible
 in code and should be replaced with organization-specific rates, machine data,
 and process knowledge for real business decisions.
+
+## Process Intelligence Boundary
+
+`src/process_intelligence.py` introduces a separate advisory layer over completed
+and inspected builds. Its responsibilities are:
+
+- validate a versioned build-level data contract
+- preserve machine, material-batch, geometry-family, and plan traceability
+- exclude rejected builds from parameter recipes
+- require a minimum accepted-build count for each machine/material domain
+- split evaluation by complete build and time
+- reject candidates outside historical applicability
+- clamp recommendations to engineer-approved parameter envelopes
+- return confidence, warnings, and evidence build IDs
+
+The module does not modify geometry, generate toolpaths, generate robot code, or
+override release validation. Raw sensor streams remain outside the compact
+build-record file and are linked using `build_id`.
 
 ## Validation Gates
 

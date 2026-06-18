@@ -52,6 +52,7 @@ Representative screenshots captured from the live Streamlit app:
 | Quality Gates | Build-plate fit, missing paths, layer height, sparse infill, high travel, path count, volumetric flow, and process evidence |
 | Commercial Inputs | Customer/job metadata, application type, batch quantity, target price, machine rate, labor rate, setup time, postprocess time, scrap, and margin |
 | Metal AM Review | Neutral DED/WAAM estimates for wire demand, heat input, deposition rate, energy, robot-cell feasibility, and qualification burden |
+| Process Intelligence | Versioned qualified-build records, dataset coverage review, applicability gating, and bounded DED parameter recommendations |
 | Visualization | Toolpath views, extrusion-width maps, speed maps, time maps, density maps, animation, pattern comparison, and 3D layer stacks |
 | Export | CSV, JSON, SVG, preview G-code, guarded FDM production G-code, markdown dossier, HTML dossier, and text report |
 | Traceability | Exports include active parameters, segment data, and stable planning fingerprints |
@@ -143,6 +144,8 @@ http://localhost:8501
 10. Export a dossier for sign-off, plus data files for engineering traceability.
 11. Use production G-code only when readiness is unblocked, process mode is FDM,
     and the selected machine profile matches the physical printer.
+12. Open Process Intelligence to upload qualified build records and request a
+    bounded DED starting-parameter recommendation for a known machine/material domain.
 
 ## Project Direction
 
@@ -220,6 +223,16 @@ interpass limit assumptions to estimate dwell. Robot-cell feasibility checks
 reach, payload, fixture mass, torch clearance, and program size. Qualification
 planning converts the application risk into coupon counts, inspection steps, and
 traceability records.
+
+The Process Intelligence workspace adds an evidence-backed learning layer for
+DED development. It stores versioned build-level records, filters training data
+to accepted builds from one compatible machine/material domain, rejects
+out-of-domain jobs, clamps recommendations to engineer-approved limits, and
+shows confidence plus the build IDs used as evidence. It never generates robot
+motion or bypasses deterministic release gates.
+
+See [docs/process-intelligence.md](docs/process-intelligence.md) for the data
+contract, validation boundary, and suggested company storage architecture.
 
 The quote model is transparent by design. Setup labor is amortized across the
 batch, while machine time, material, and postprocess labor remain per-part
@@ -302,6 +315,8 @@ See [docs/limitations.md](docs/limitations.md) for the fuller list.
 - Add optional report templates for customer-facing feasibility studies,
   internal engineering reviews, and production handoff packages.
 - Add benchmark fixtures for large geometries and dense infill patterns.
+- Add telemetry adapters for OPC UA, robot logs, thermal cameras, and inspection systems.
+- Add immutable model cards and grouped chronological evaluation reports per machine/material domain.
 
 ## Project Structure
 
@@ -314,6 +329,7 @@ src/toolpaths.py        Perimeters, infill generation, ordering, and segments
 src/planner.py          Typed planning engine, production segment generation, ranking, and fingerprints
 src/metrics.py          Path, time, material, and efficiency metrics
 src/job_analysis.py     Quote, productivity, risk, and dossier generation
+src/process_intelligence.py Qualified-build schema and bounded recommendation engine
 src/validation.py       Manufacturability readiness checks
 src/exporters.py        CSV, JSON, SVG, preview G-code, and production G-code
 src/plotting.py         Plotly 2D/3D visualization builders
@@ -321,6 +337,7 @@ src/stl_import.py       STL metadata and cross-section slicing
 src/svg_import.py       SVG outline parsing
 ui/                     Streamlit controls and panels
 pages/tutorial.py       Built-in guide and teaching workflow
+pages/process_intelligence.py Company dataset and recommendation workspace
 docs/                   Architecture, validation, limitations, and demo notes
 examples/               Small SVG, JSON, and dossier demo assets
 tests/                  Pytest coverage plus Streamlit smoke and text-quality checks
