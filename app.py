@@ -531,7 +531,11 @@ shape_settings = {
 
 source_label = shape_type
 if uploaded_stl is not None and stl_bytes is not None:
-    shape = slice_stl_to_polygon(stl_bytes, z_height=stl_slice_z, target_width_mm=stl_target_width)
+    try:
+        shape = slice_stl_to_polygon(stl_bytes, z_height=stl_slice_z, target_width_mm=stl_target_width)
+    except ValueError as exc:
+        st.error(f"STL import failed: {exc}")
+        st.stop()
     source_label = f"STL slice Z={stl_slice_z:.2f}"
     if shape is None:
         st.error(
